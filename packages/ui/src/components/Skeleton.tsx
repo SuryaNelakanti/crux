@@ -14,7 +14,7 @@ import { durations, type Theme } from '@crux/theme';
 // Types
 // ============================================================================
 
-export interface SkeletonProps extends Omit<BoxProps, 'backgroundColor'> {
+export interface SkeletonProps extends Omit<BoxProps, 'backgroundColor' | 'width' | 'height'> {
     /** Width (number or string like '100%') */
     width?: number | string;
     /** Height */
@@ -69,13 +69,9 @@ export function Skeleton({
 
     return (
         <AnimatedBox
-            style={[
-                animatedStyle,
-                {
-                    width: typeof width === 'number' ? width : width,
-                    height,
-                },
-            ]}
+            style={animatedStyle}
+            width={width as number}
+            height={height}
             backgroundColor="skeletonBase"
             borderRadius={borderRadius}
             overflow="hidden"

@@ -8,5 +8,10 @@
  * - View session history
  */
 
-// Re-export from submodules when implemented
-export { };
+export {
+    createSession,
+    endSession,
+    getSessionById,
+    getSessionSummaries,
+    type SessionSummary,
+} from '@/lib/db';

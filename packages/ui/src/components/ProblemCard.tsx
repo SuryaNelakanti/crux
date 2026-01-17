@@ -39,7 +39,7 @@ export interface ProblemCardProps {
 // Helpers
 // ============================================================================
 
-const getOutcomeBadge = (outcome: ProblemOutcome): { label: string; variant: BadgeVariant } | null => {
+const getOutcomeBadge = (outcome: ProblemOutcome | undefined): { label: string; variant: BadgeVariant } | null => {
     switch (outcome) {
         case 'flash':
             return { label: '⚡ Flash', variant: 'success' };
@@ -156,7 +156,7 @@ export function ProblemCard({
 
                     {/* Outcome badge overlay */}
                     {outcomeBadge && (
-                        <Box position="absolute" top="s" right="s">
+                        <Box position="absolute" top={8} right={8}>
                             <Badge label={outcomeBadge.label} variant={outcomeBadge.variant} size="small" />
                         </Box>
                     )}

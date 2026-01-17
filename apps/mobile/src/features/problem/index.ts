@@ -8,5 +8,11 @@
  * - Set grade/attempts
  */
 
-// Re-export from submodules when implemented
-export { };
+export {
+    createProblemFromPhoto,
+    getProblemById,
+    getProblemCardsForSession,
+    getUserProblemLog,
+    upsertUserProblemLog,
+    type ProblemCardItem,
+} from '@/lib/db';

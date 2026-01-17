@@ -17,18 +17,25 @@
         ],
         "ios": {
             "supportsTablet": false,
-            "bundleIdentifier": "com.crux.app"
+            "bundleIdentifier": "com.crux.app",
+            "infoPlist": {
+                "NSCameraUsageDescription": "Capture problem photos for your climbing journal."
+            }
         },
         "android": {
             "adaptiveIcon": {
                 "foregroundImage": "./assets/adaptive-icon.png",
                 "backgroundColor": "#09090B"
             },
-            "package": "com.crux.app"
+            "package": "com.crux.app",
+            "permissions": [
+                "CAMERA"
+            ]
         },
         "plugins": [
             "expo-router",
-            "expo-font"
+            "expo-font",
+            "expo-camera"
         ],
         "experiments": {
             "typedRoutes": true

@@ -154,3 +154,25 @@ Create `/design-system` route that displays:
 - Designers have a systematic review surface
 - Changes are immediately visible
 - Serves as living documentation
+
+---
+
+## ADR-007: Core schema + local-first outbox sync
+
+**Date:** 2026-01-17
+
+**Status:** Accepted
+
+**Context:**
+MVP requires offline-first logging with reliable sync, plus strong access control for shared problems.
+We also need explicit schema + RLS to enforce ownership and membership.
+
+**Decision:**
+Add a full Supabase schema (sessions, problems, media, masks, logs, events) with RLS policies and share-link RPCs.
+Mirror the schema locally in SQLite with outbox tables for events/media and a sync worker that flushes uploads,
+upserts rows, and pulls shared problem changes. Camera capture uses Expo Camera with on-device photo processing.
+
+**Consequences:**
+- Offline captures are durable and syncable without network
+- Access control is enforced at the database level
+- Sync logic is explicit and testable, with clear failure states
