@@ -10,7 +10,7 @@ import { generateMask, type HSL } from '@crux/vision';
 import { generateId } from '@crux/shared';
 
 const MASK_DIR = `${FileSystem.documentDirectory ?? ''}media/masks`;
-const MASK_TINT = { r: 30, g: 220, b: 255, a: 180 };
+const MASK_TINT = { r: 27, g: 175, b: 161, a: 180 };
 
 const ensureMaskDir = async (): Promise<void> => {
     if (!FileSystem.documentDirectory) return;

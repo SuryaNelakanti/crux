@@ -31,18 +31,16 @@ export function useThemeControl() {
 // ============================================================================
 
 export default function RootLayout() {
-    const [themeName, setThemeName] = useState<ThemeName>('dark');
+    const [themeName, setThemeName] = useState<ThemeName>('light');
 
-    // Load custom fonts
-    // Load custom fonts
     // const [fontsLoaded] = useFonts({
-    //     'Inter': require('../assets/fonts/Inter-Regular.ttf'),
-    //     'Inter-Medium': require('../assets/fonts/Inter-Medium.ttf'),
-    //     'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
-    //     'Inter-Bold': require('../assets/fonts/Inter-Bold.ttf'),
-    //     'JetBrainsMono': require('../assets/fonts/JetBrainsMono-Regular.ttf'),
+    //     'AvenirNext-Regular': require('../assets/fonts/AvenirNext-Regular.ttf'),
+    //     'AvenirNext-Medium': require('../assets/fonts/AvenirNext-Medium.ttf'),
+    //     'AvenirNext-DemiBold': require('../assets/fonts/AvenirNext-DemiBold.ttf'),
+    //     'AvenirNext-Bold': require('../assets/fonts/AvenirNext-Bold.ttf'),
+    //     'SFMono-Regular': require('../assets/fonts/SFMono-Regular.ttf'),
     // });
-    const fontsLoaded = true; // Temporary bypass
+    const fontsLoaded = true; // Using system fonts for now
 
     const toggleTheme = () => {
         setThemeName((prev) => (prev === 'dark' ? 'light' : 'dark'));

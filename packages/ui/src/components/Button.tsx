@@ -51,7 +51,7 @@ const getBackgroundColor = (variant: ButtonVariant, disabled: boolean): keyof Th
         case 'primary':
             return 'accentBrand';
         case 'secondary':
-            return 'bgSurface';
+            return 'bgSurfaceRaised';
         case 'ghost':
             return 'transparent';
         case 'destructive':
@@ -69,7 +69,7 @@ const getTextColor = (variant: ButtonVariant, disabled: boolean): keyof Theme['c
         case 'secondary':
             return 'textPrimary';
         case 'ghost':
-            return 'textBrand';
+            return 'textPrimary';
         case 'destructive':
             return 'white';
         default:
@@ -80,13 +80,26 @@ const getTextColor = (variant: ButtonVariant, disabled: boolean): keyof Theme['c
 const getPadding = (size: ButtonSize) => {
     switch (size) {
         case 'small':
-            return { paddingVertical: 'xs' as const, paddingHorizontal: 's' as const };
+            return { paddingVertical: 'xs' as const, paddingHorizontal: 'm' as const };
         case 'medium':
             return { paddingVertical: 's' as const, paddingHorizontal: 'm' as const };
         case 'large':
-            return { paddingVertical: 'm' as const, paddingHorizontal: 'l' as const };
+            return { paddingVertical: 'm' as const, paddingHorizontal: 'xl' as const };
         default:
             return { paddingVertical: 's' as const, paddingHorizontal: 'm' as const };
+    }
+};
+
+const getMinHeight = (size: ButtonSize): number => {
+    switch (size) {
+        case 'small':
+            return 36;
+        case 'medium':
+            return 44;
+        case 'large':
+            return 54;
+        default:
+            return 44;
     }
 };
 
@@ -143,8 +156,16 @@ export function Button({
 
     const isDisabled = disabled || loading;
     const padding = getPadding(size);
+    const minHeight = getMinHeight(size);
     const bgColor = getBackgroundColor(variant, isDisabled);
     const textColor = getTextColor(variant, isDisabled);
+    const showShadow = variant === 'primary' || variant === 'destructive';
+    const borderColor =
+        variant === 'secondary'
+            ? 'borderStrong'
+            : variant === 'ghost'
+                ? 'borderMuted'
+                : 'accentBrandPressed';
 
     return (
         <Pressable
@@ -157,18 +178,23 @@ export function Button({
             {...pressableProps}
         >
             <AnimatedBox
-                style={animatedStyle}
+                style={[animatedStyle, { minHeight }]}
                 backgroundColor={bgColor}
                 paddingVertical={padding.paddingVertical}
                 paddingHorizontal={padding.paddingHorizontal}
-                borderRadius="m"
+                borderRadius="full"
                 flexDirection="row"
                 alignItems="center"
                 justifyContent="center"
                 gap="xs"
-                borderWidth={variant === 'secondary' ? 1 : 0}
-                borderColor={variant === 'secondary' ? 'borderDefault' : undefined}
+                borderWidth={variant === 'ghost' || variant === 'secondary' ? 1 : 0}
+                borderColor={variant === 'ghost' || variant === 'secondary' ? borderColor : undefined}
                 opacity={isDisabled ? 0.6 : 1}
+                shadowColor={showShadow ? theme.colors.black : undefined}
+                shadowOffset={showShadow ? { width: 0, height: 8 } : undefined}
+                shadowOpacity={showShadow ? 0.18 : 0}
+                shadowRadius={showShadow ? 12 : 0}
+                elevation={showShadow ? 4 : 0}
             >
                 {loading ? (
                     <ActivityIndicator

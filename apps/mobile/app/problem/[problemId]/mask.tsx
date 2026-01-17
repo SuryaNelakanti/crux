@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder } from 'react-native';
+import { PanResponder, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Box, Button, Card, SegmentedControl, Text } from '@crux/ui';
+import { useTheme } from '@shopify/restyle';
+import { Badge, Box, Button, Card, SegmentedControl, Text } from '@crux/ui';
 import {
     Canvas,
     Image as SkiaImage,
@@ -17,9 +18,11 @@ import {
     createMaskImage,
     getActiveRouteMaskForProblem,
     loadMaskPixels,
-    maskTint,
     saveEditedMaskForProblem,
 } from '@/features/mask';
+import { DoodleWave, Sparkle } from '@/components/Doodle';
+import { ScreenReveal } from '@/components/ScreenReveal';
+import type { Theme } from '@crux/theme';
 
 const MODE_OPTIONS = [
     { value: 'add', label: 'Add' },
@@ -32,8 +35,19 @@ const BRUSH_OPTIONS = [
     { value: 'large', label: 'Large' },
 ] as const;
 
+const toRgba = (hex: string, alpha: number) => {
+    const normalized = hex.replace('#', '');
+    if (normalized.length !== 6) return hex;
+    const value = parseInt(normalized, 16);
+    const r = (value >> 16) & 255;
+    const g = (value >> 8) & 255;
+    const b = value & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 export default function MaskEditorScreen() {
     const router = useRouter();
+    const theme = useTheme<Theme>();
     const { problemId } = useLocalSearchParams<{ problemId: string }>();
     const [photoUri, setPhotoUri] = useState<string | null>(null);
     const [maskImage, setMaskImage] = useState<SkImage | null>(null);
@@ -115,6 +129,9 @@ export default function MaskEditorScreen() {
         return viewRadius * 2;
     }, [brushRadius, maskSize, viewWidth, viewHeight]);
 
+    const addStrokeColor = toRgba(theme.colors.accentBrand, 0.8);
+    const eraseStrokeColor = toRgba(theme.colors.statusError, 0.8);
+
     const applyBrushAtPoint = useCallback(
         (x: number, y: number) => {
             if (!maskRef.current || !maskRgbaRef.current || !maskSize) return;
@@ -188,115 +205,147 @@ export default function MaskEditorScreen() {
     const loading = !photoUri || (!maskImage && !maskMissing) || (!maskSize && !maskMissing);
 
     return (
-        <Box flex={1} backgroundColor="bgCanvas" padding="m" gap="m">
-            <Box flexDirection="row" justifyContent="space-between">
-                <Button
-                    label="Back"
-                    variant="secondary"
-                    size="small"
-                    onPress={() => router.back()}
-                />
-                <Button
-                    label={saving ? 'Saving...' : 'Save'}
-                    variant="primary"
-                    size="small"
-                    onPress={handleSave}
-                    disabled={saving || !maskRef.current}
-                />
-            </Box>
+        <Box flex={1} backgroundColor="bgCanvas">
+            <ScrollView
+                contentContainerStyle={{
+                    padding: theme.spacing.m,
+                    paddingBottom: theme.spacing['3xl'],
+                }}
+            >
+                <Box gap="xl">
+                    <ScreenReveal>
+                        <Box flexDirection="row" justifyContent="space-between" alignItems="center">
+                            <Button
+                                label="Back"
+                                variant="ghost"
+                                size="small"
+                                onPress={() => router.back()}
+                            />
+                            <Box flexDirection="row" alignItems="center" gap="xs">
+                                <Sparkle size={18} color="accentBrand" />
+                                <DoodleWave width={70} height={18} color="accentBrand" />
+                            </Box>
+                            <Button
+                                label={saving ? 'Saving...' : 'Save'}
+                                variant="primary"
+                                size="small"
+                                onPress={handleSave}
+                                disabled={saving || !maskRef.current}
+                            />
+                        </Box>
+                    </ScreenReveal>
 
-            <Box gap="s">
-                <Text variant="headingSmall" color="textPrimary">
-                    Edit Mask
-                </Text>
-                <Text variant="bodySmall" color="textSecondary">
-                    Paint to add or erase holds, then save a new version.
-                </Text>
-            </Box>
+                    <ScreenReveal delay={120}>
+                        <Card variant="outlined">
+                            <Box gap="s">
+                                <Text variant="headingSmall" color="textPrimary">
+                                    Edit mask
+                                </Text>
+                                <Text variant="bodySmall" color="textSecondary">
+                                    Paint to add or erase holds. Saving creates a new version.
+                                </Text>
+                                <Box flexDirection="row" gap="s">
+                                    <Badge label="Brush" variant="brand" size="small" />
+                                    <Badge label="Versioned" variant="info" size="small" />
+                                </Box>
+                            </Box>
+                        </Card>
+                    </ScreenReveal>
 
-            {maskMissing ? (
-                <Card variant="outlined">
-                    <Text variant="bodyMedium" color="textMuted">
-                        Mask not ready yet. Capture a new photo or wait for the
-                        auto mask to finish.
-                    </Text>
-                </Card>
-            ) : loading ? (
-                <Card variant="outlined">
-                    <Text variant="bodyMedium" color="textMuted">
-                        Loading mask...
-                    </Text>
-                </Card>
-            ) : (
-                <Box
-                    onLayout={(event) =>
-                        setViewWidth(event.nativeEvent.layout.width)
-                    }
-                    {...panResponder.panHandlers}
-                >
-                    {viewWidth && viewHeight && (
-                        <Canvas style={{ width: viewWidth, height: viewHeight }}>
-                            {photoImage && (
-                                <SkiaImage
-                                    image={photoImage}
-                                    x={0}
-                                    y={0}
-                                    width={viewWidth}
-                                    height={viewHeight}
-                                    fit="cover"
-                                />
-                            )}
-                            {maskImage && (
-                                <SkiaImage
-                                    image={maskImage}
-                                    x={0}
-                                    y={0}
-                                    width={viewWidth}
-                                    height={viewHeight}
-                                    fit="cover"
-                                    opacity={0.7}
-                                />
-                            )}
-                            {strokePath && (
-                                <Path
-                                    path={strokePath}
-                                    color={
-                                        mode === 'add'
-                                            ? `rgba(${maskTint.r}, ${maskTint.g}, ${maskTint.b}, 0.8)`
-                                            : 'rgba(255, 90, 90, 0.8)'
-                                    }
-                                    style="stroke"
-                                    strokeWidth={strokeWidth}
-                                    strokeJoin="round"
-                                    strokeCap="round"
-                                />
-                            )}
-                        </Canvas>
-                    )}
+                    <ScreenReveal delay={180}>
+                        {maskMissing ? (
+                            <Card variant="outlined">
+                                <Text variant="bodyMedium" color="textMuted">
+                                    Mask not ready yet. Capture a new photo or wait for the auto mask to finish.
+                                </Text>
+                            </Card>
+                        ) : loading ? (
+                            <Card variant="outlined">
+                                <Text variant="bodyMedium" color="textMuted">
+                                    Loading mask...
+                                </Text>
+                            </Card>
+                        ) : (
+                            <Box
+                                onLayout={(event) =>
+                                    setViewWidth(event.nativeEvent.layout.width)
+                                }
+                                borderRadius="l"
+                                overflow="hidden"
+                                borderWidth={1}
+                                borderColor="borderMuted"
+                                {...panResponder.panHandlers}
+                            >
+                                {viewWidth && viewHeight && (
+                                    <Canvas style={{ width: viewWidth, height: viewHeight }}>
+                                        {photoImage && (
+                                            <SkiaImage
+                                                image={photoImage}
+                                                x={0}
+                                                y={0}
+                                                width={viewWidth}
+                                                height={viewHeight}
+                                                fit="cover"
+                                            />
+                                        )}
+                                        {maskImage && (
+                                            <SkiaImage
+                                                image={maskImage}
+                                                x={0}
+                                                y={0}
+                                                width={viewWidth}
+                                                height={viewHeight}
+                                                fit="cover"
+                                                opacity={0.7}
+                                            />
+                                        )}
+                                        {strokePath && (
+                                            <Path
+                                                path={strokePath}
+                                                color={
+                                                    mode === 'add'
+                                                        ? addStrokeColor
+                                                        : eraseStrokeColor
+                                                }
+                                                style="stroke"
+                                                strokeWidth={strokeWidth}
+                                                strokeJoin="round"
+                                                strokeCap="round"
+                                            />
+                                        )}
+                                    </Canvas>
+                                )}
+                            </Box>
+                        )}
+                    </ScreenReveal>
+
+                    <ScreenReveal delay={220}>
+                        <Box gap="s">
+                            <Text variant="labelLarge" color="textSecondary">
+                                Mode
+                            </Text>
+                            <SegmentedControl<'add' | 'erase'>
+                                options={[...MODE_OPTIONS]}
+                                value={mode}
+                                onChange={setMode}
+                            />
+                        </Box>
+                    </ScreenReveal>
+
+                    <ScreenReveal delay={260}>
+                        <Box gap="s">
+                            <Text variant="labelLarge" color="textSecondary">
+                                Brush size
+                            </Text>
+                            <SegmentedControl<'small' | 'medium' | 'large'>
+                                options={[...BRUSH_OPTIONS]}
+                                value={brushSize}
+                                onChange={setBrushSize}
+                            />
+                        </Box>
+                    </ScreenReveal>
                 </Box>
-            )}
-
-            <Box gap="s">
-                <Text variant="labelLarge" color="textSecondary">
-                    Mode
-                </Text>
-                <SegmentedControl<'add' | 'erase'>
-                    options={[...MODE_OPTIONS]}
-                    value={mode}
-                    onChange={setMode}
-                />
-            </Box>
-
-            <Box gap="s">
-                <Text variant="labelLarge" color="textSecondary">
-                    Brush size
-                </Text>
-                <SegmentedControl<'small' | 'medium' | 'large'>
-                    options={[...BRUSH_OPTIONS]}
-                    value={brushSize}
-                    onChange={setBrushSize}
-                />
-            </Box>
+            </ScrollView>
         </Box>
     );
 }

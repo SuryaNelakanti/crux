@@ -78,10 +78,16 @@ export function TextField({
                 [0, 1],
                 [theme.colors.borderDefault, theme.colors.borderFocus]
             );
+        const backgroundColor = interpolateColor(
+            focused.value,
+            [0, 1],
+            [theme.colors.bgSurface, theme.colors.bgSurfaceRaised]
+        );
 
         return {
             borderColor,
             borderWidth: focused.value > 0.5 || error ? 2 : 1,
+            backgroundColor,
         };
     });
 
@@ -99,10 +105,9 @@ export function TextField({
 
             <AnimatedBox
                 style={borderAnimatedStyle}
-                backgroundColor="bgSurface"
-                borderRadius="m"
+                borderRadius="l"
                 paddingHorizontal="m"
-                paddingVertical="s"
+                paddingVertical="m"
             >
                 <TextInput
                     placeholder={placeholder}

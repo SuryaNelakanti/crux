@@ -6,11 +6,11 @@
  */
 
 export const fontFamilies = {
-    sans: 'Inter',
-    sansMedium: 'Inter-Medium',
-    sansSemiBold: 'Inter-SemiBold',
-    sansBold: 'Inter-Bold',
-    mono: 'JetBrainsMono',
+    sans: 'AvenirNext-Regular',
+    sansMedium: 'AvenirNext-Medium',
+    sansSemiBold: 'AvenirNext-DemiBold',
+    sansBold: 'AvenirNext-Bold',
+    mono: 'SFMono-Regular',
 } as const;
 
 export type FontFamily = keyof typeof fontFamilies;

@@ -8,11 +8,11 @@ import { palette } from '../tokens/colors';
  */
 export const lightColors = {
     // Backgrounds
-    bgCanvas: palette.white,
-    bgSurface: palette.gray50,
+    bgCanvas: palette.gray50,
+    bgSurface: palette.gray100,
     bgSurfaceRaised: palette.white,
-    bgSurfacePressed: palette.gray100,
-    bgMuted: palette.gray100,
+    bgSurfacePressed: palette.gray200,
+    bgMuted: palette.gray200,
     bgInverse: palette.gray900,
 
     // Text
@@ -20,15 +20,15 @@ export const lightColors = {
     textSecondary: palette.gray600,
     textMuted: palette.gray400,
     textInverse: palette.white,
-    textBrand: palette.orange600,
-    textLink: palette.orange600,
+    textBrand: palette.teal600,
+    textLink: palette.teal600,
 
     // Brand/Accent
-    accentBrand: palette.orange500,
-    accentBrandHover: palette.orange600,
-    accentBrandPressed: palette.orange700,
-    accentBrandMuted: palette.orange100,
-    accentBrandSubtle: palette.orange50,
+    accentBrand: palette.teal500,
+    accentBrandHover: palette.teal600,
+    accentBrandPressed: palette.teal700,
+    accentBrandMuted: palette.teal100,
+    accentBrandSubtle: palette.teal50,
 
     // Interactive states
     interactiveDefault: palette.gray900,
@@ -54,7 +54,7 @@ export const lightColors = {
     borderDefault: palette.gray200,
     borderMuted: palette.gray100,
     borderStrong: palette.gray300,
-    borderFocus: palette.orange500,
+    borderFocus: palette.teal500,
     borderError: palette.red500,
 
     // Icons
@@ -62,7 +62,7 @@ export const lightColors = {
     iconSecondary: palette.gray500,
     iconMuted: palette.gray400,
     iconInverse: palette.white,
-    iconBrand: palette.orange500,
+    iconBrand: palette.teal500,
 
     // Overlays
     overlaySubtle: 'rgba(0, 0, 0, 0.04)',

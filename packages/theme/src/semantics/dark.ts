@@ -13,22 +13,22 @@ export const darkColors = {
     bgSurfaceRaised: palette.gray800,
     bgSurfacePressed: palette.gray700,
     bgMuted: palette.gray800,
-    bgInverse: palette.white,
+    bgInverse: palette.gray50,
 
     // Text
     textPrimary: palette.gray50,
     textSecondary: palette.gray400,
     textMuted: palette.gray500,
     textInverse: palette.gray900,
-    textBrand: palette.orange400,
-    textLink: palette.orange400,
+    textBrand: palette.teal300,
+    textLink: palette.teal300,
 
     // Brand/Accent
-    accentBrand: palette.orange500,
-    accentBrandHover: palette.orange400,
-    accentBrandPressed: palette.orange600,
-    accentBrandMuted: palette.orange900,
-    accentBrandSubtle: palette.orange900,
+    accentBrand: palette.teal400,
+    accentBrandHover: palette.teal300,
+    accentBrandPressed: palette.teal500,
+    accentBrandMuted: palette.teal900,
+    accentBrandSubtle: palette.teal900,
 
     // Interactive states
     interactiveDefault: palette.gray50,
@@ -54,7 +54,7 @@ export const darkColors = {
     borderDefault: palette.gray700,
     borderMuted: palette.gray800,
     borderStrong: palette.gray600,
-    borderFocus: palette.orange500,
+    borderFocus: palette.teal400,
     borderError: palette.red500,
 
     // Icons
@@ -62,7 +62,7 @@ export const darkColors = {
     iconSecondary: palette.gray400,
     iconMuted: palette.gray500,
     iconInverse: palette.gray900,
-    iconBrand: palette.orange400,
+    iconBrand: palette.teal300,
 
     // Overlays
     overlaySubtle: 'rgba(255, 255, 255, 0.04)',

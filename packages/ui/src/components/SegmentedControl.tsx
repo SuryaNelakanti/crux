@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable } from 'react-native';
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
-    withSpring,
+    withTiming,
 } from 'react-native-reanimated';
+import { useTheme } from '@shopify/restyle';
 import { Box } from '../primitives/Box';
 import { Text } from '../primitives/Text';
-import { springs, triggerHaptic } from '@crux/theme';
+import { durations, easing, triggerHaptic, type Theme } from '@crux/theme';
 
 // ============================================================================
 // Types
@@ -58,7 +59,24 @@ export function SegmentedControl<T extends string>({
     onChange,
     disabled = false,
 }: SegmentedControlProps<T>) {
-    const selectedIndex = options.findIndex((opt) => opt.value === value);
+    const theme = useTheme<Theme>();
+    const selectedIndex = options.findIndex((opt) => opt.value === value);      
+    const [containerWidth, setContainerWidth] = useState(0);
+    const indicatorX = useSharedValue(0);
+
+    const inset = theme.spacing['2xs'];
+    const segmentWidth =
+        containerWidth > 0
+            ? (containerWidth - inset * 2) / options.length
+            : 0;
+
+    useEffect(() => {
+        if (!segmentWidth) return;
+        indicatorX.value = withTiming(inset + selectedIndex * segmentWidth, {
+            duration: durations.fast,
+            easing: easing.standardDecelerate,
+        });
+    }, [indicatorX, inset, segmentWidth, selectedIndex]);
 
     const handlePress = (optionValue: T) => {
         if (disabled) return;
@@ -66,14 +84,38 @@ export function SegmentedControl<T extends string>({
         onChange(optionValue);
     };
 
+    const indicatorStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: indicatorX.value }],
+    }));
+
     return (
         <Box
             flexDirection="row"
-            backgroundColor="bgMuted"
-            borderRadius="m"
+            backgroundColor="bgSurface"
+            borderRadius="full"
             padding="2xs"
+            borderWidth={1}
+            borderColor="borderMuted"
             opacity={disabled ? 0.5 : 1}
+            onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
+            position="relative"
         >
+            {segmentWidth > 0 && (
+                <AnimatedBox
+                    style={indicatorStyle}
+                    position="absolute"
+                    top={inset}
+                    bottom={inset}
+                    width={segmentWidth}
+                    borderRadius="full"
+                    backgroundColor="bgSurfaceRaised"
+                    shadowColor={theme.colors.black}
+                    shadowOffset={{ width: 0, height: 4 }}
+                    shadowOpacity={0.12}
+                    shadowRadius={8}
+                    elevation={3}
+                />
+            )}
             {options.map((option, index) => {
                 const isSelected = option.value === value;
 
@@ -89,15 +131,10 @@ export function SegmentedControl<T extends string>({
                         <Box
                             paddingVertical="s"
                             paddingHorizontal="m"
-                            borderRadius="s"
-                            backgroundColor={isSelected ? 'bgSurfaceRaised' : 'transparent'}
+                            borderRadius="full"
+                            backgroundColor="transparent"
                             alignItems="center"
                             justifyContent="center"
-                            shadowColor={isSelected ? 'black' : undefined}
-                            shadowOffset={isSelected ? { width: 0, height: 1 } : undefined}
-                            shadowOpacity={isSelected ? 0.05 : 0}
-                            shadowRadius={isSelected ? 2 : 0}
-                            elevation={isSelected ? 1 : 0}
                         >
                             <Text
                                 variant="labelMedium"

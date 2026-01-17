@@ -5,8 +5,9 @@ import Animated, {
     useSharedValue,
     withSpring,
 } from 'react-native-reanimated';
+import { useTheme } from '@shopify/restyle';
 import { Box, type BoxProps } from '../primitives/Box';
-import { springs, patterns, triggerHaptic } from '@crux/theme';
+import { springs, patterns, triggerHaptic, type Theme } from '@crux/theme';
 
 // ============================================================================
 // Types
@@ -29,27 +30,34 @@ export interface CardProps extends Omit<BoxProps, 'style'> {
 // Helpers
 // ============================================================================
 
-const getVariantStyles = (variant: CardVariant): Partial<BoxProps> => {
+const getVariantStyles = (
+    variant: CardVariant,
+    theme: Theme
+): Partial<BoxProps> => {
     switch (variant) {
         case 'elevated':
             return {
                 backgroundColor: 'bgSurfaceRaised',
-                shadowColor: 'black',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.08,
-                shadowRadius: 8,
-                elevation: 4,
+                shadowColor: theme.colors.black,
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.12,
+                shadowRadius: 16,
+                elevation: 6,
+                borderWidth: 1,
+                borderColor: 'borderMuted',
             } as Partial<BoxProps>;
         case 'outlined':
             return {
-                backgroundColor: 'bgSurface',
+                backgroundColor: 'bgSurfaceRaised',
                 borderWidth: 1,
-                borderColor: 'borderDefault',
+                borderColor: 'borderStrong',
             };
         case 'default':
         default:
             return {
                 backgroundColor: 'bgSurface',
+                borderWidth: 1,
+                borderColor: 'borderMuted',
             };
     }
 };
@@ -77,6 +85,7 @@ export function Card({
     children,
     ...boxProps
 }: CardProps) {
+    const theme = useTheme<Theme>();
     const scale = useSharedValue(1);
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -92,13 +101,13 @@ export function Card({
         scale.value = withSpring(1, springs.snappy);
     };
 
-    const variantStyles = getVariantStyles(variant);
+    const variantStyles = getVariantStyles(variant, theme);
 
     const cardContent = (
         <AnimatedBox
             style={pressable ? animatedStyle : undefined}
             padding="m"
-            borderRadius="m"
+            borderRadius="l"
             overflow="hidden"
             {...variantStyles}
             {...boxProps}

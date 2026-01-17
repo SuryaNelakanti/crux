@@ -10,7 +10,7 @@
         "splash": {
             "image": "./assets/splash.png",
             "resizeMode": "contain",
-            "backgroundColor": "#09090B"
+            "backgroundColor": "#F7F8FA"
         },
         "assetBundlePatterns": [
             "**/*"
@@ -25,7 +25,7 @@
         "android": {
             "adaptiveIcon": {
                 "foregroundImage": "./assets/adaptive-icon.png",
-                "backgroundColor": "#09090B"
+                "backgroundColor": "#F7F8FA"
             },
             "package": "com.crux.app",
             "permissions": [

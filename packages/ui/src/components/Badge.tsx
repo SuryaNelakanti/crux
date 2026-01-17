@@ -66,7 +66,9 @@ export function Badge({
             backgroundColor={colors.bg}
             paddingHorizontal={isSmall ? 'xs' : 's'}
             paddingVertical={isSmall ? '2xs' : 'xs'}
-            borderRadius={isSmall ? 'xs' : 's'}
+            borderRadius="full"
+            borderWidth={1}
+            borderColor={variant === 'default' ? 'borderMuted' : colors.text}
             alignSelf="flex-start"
         >
             <Text

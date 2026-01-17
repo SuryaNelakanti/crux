@@ -40,13 +40,22 @@ export function StatChip({
     accent = 'textPrimary',
 }: StatChipProps) {
     return (
-        <Box alignItems="center" gap="2xs">
+        <Box
+            alignItems="center"
+            gap="2xs"
+            padding="s"
+            borderRadius="l"
+            backgroundColor="bgSurface"
+            borderWidth={1}
+            borderColor="borderMuted"
+            minWidth={86}
+        >
             {icon && (
                 <Box marginBottom="2xs">
                     {icon}
                 </Box>
             )}
-            <Text variant="statMedium" color={accent}>
+            <Text variant="statSmall" color={accent}>
                 {value}
             </Text>
             <Text variant="labelSmall" color="textSecondary">

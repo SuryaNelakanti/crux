@@ -5,10 +5,11 @@ import Animated, {
     useSharedValue,
     withSpring,
 } from 'react-native-reanimated';
+import { useTheme } from '@shopify/restyle';
 import { Box } from '../primitives/Box';
 import { Text } from '../primitives/Text';
 import { Badge, type BadgeVariant } from './Badge';
-import { springs, patterns, triggerHaptic } from '@crux/theme';
+import { springs, patterns, triggerHaptic, type Theme } from '@crux/theme';
 
 // ============================================================================
 // Types
@@ -86,6 +87,7 @@ export function ProblemCard({
     onPress,
     compact = false,
 }: ProblemCardProps) {
+    const theme = useTheme<Theme>();
     const scale = useSharedValue(1);
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -102,7 +104,7 @@ export function ProblemCard({
     };
 
     const outcomeBadge = getOutcomeBadge(outcome);
-    const imageHeight = compact ? 120 : 200;
+    const imageHeight = compact ? 140 : 220;
 
     return (
         <Pressable
@@ -113,14 +115,16 @@ export function ProblemCard({
         >
             <AnimatedBox
                 style={animatedStyle}
-                backgroundColor="bgSurface"
-                borderRadius="m"
+                backgroundColor="bgSurfaceRaised"
+                borderRadius="l"
                 overflow="hidden"
-                shadowColor="black"
-                shadowOffset={{ width: 0, height: 2 }}
-                shadowOpacity={0.06}
-                shadowRadius={4}
-                elevation={2}
+                borderWidth={1}
+                borderColor="borderMuted"
+                shadowColor={theme.colors.black}
+                shadowOffset={{ width: 0, height: 10 }}
+                shadowOpacity={0.12}
+                shadowRadius={16}
+                elevation={4}
             >
                 {/* Image container */}
                 <Box position="relative" height={imageHeight}>
@@ -147,37 +151,64 @@ export function ProblemCard({
                                 style={{
                                     width: '100%',
                                     height: '100%',
-                                    opacity: 0.6,
+                                    opacity: 0.55,
                                 }}
                                 resizeMode="cover"
                             />
                         </Box>
                     )}
 
-                    {/* Outcome badge overlay */}
+                    {/* Top badges */}
+                    <Box position="absolute" top={10} left={10} flexDirection="row" gap="xs">
+                        {showMask && maskSource && (
+                            <Badge label="Mask" variant="brand" size="small" />
+                        )}
+                    </Box>
                     {outcomeBadge && (
-                        <Box position="absolute" top={8} right={8}>
-                            <Badge label={outcomeBadge.label} variant={outcomeBadge.variant} size="small" />
+                        <Box position="absolute" top={10} right={10}>
+                            <Badge
+                                label={outcomeBadge.label}
+                                variant={outcomeBadge.variant}
+                                size="small"
+                            />
+                        </Box>
+                    )}
+
+                    {/* Bottom overlay */}
+                    {(gradeLabel || attempts !== undefined) && (
+                        <Box
+                            position="absolute"
+                            left={0}
+                            right={0}
+                            bottom={0}
+                            padding="s"
+                            backgroundColor="overlayLight"
+                        >
+                            <Box flexDirection="row" justifyContent="space-between" alignItems="center">
+                                {gradeLabel && (
+                                    <Text variant="labelLarge" color="textPrimary">
+                                        {gradeLabel}
+                                    </Text>
+                                )}
+                                {attempts !== undefined && (
+                                    <Text variant="labelMedium" color="textSecondary">
+                                        {attempts} {attempts === 1 ? 'attempt' : 'attempts'}
+                                    </Text>
+                                )}
+                            </Box>
                         </Box>
                     )}
                 </Box>
 
                 {/* Metadata */}
-                {!compact && (gradeLabel || attempts !== undefined) && (
-                    <Box padding="s" flexDirection="row" justifyContent="space-between" alignItems="center">
-                        {gradeLabel && (
-                            <Text variant="labelLarge" color="textPrimary">
-                                {gradeLabel}
-                            </Text>
-                        )}
-                        {attempts !== undefined && (
-                            <Text variant="statSmall" color="textSecondary">
-                                {attempts} {attempts === 1 ? 'attempt' : 'attempts'}
-                            </Text>
-                        )}
+                {!compact && outcomeBadge && (
+                    <Box padding="m">
+                        <Text variant="bodySmall" color="textSecondary">
+                            Tap to edit log and mask
+                        </Text>
                     </Box>
                 )}
             </AnimatedBox>
-        </Pressable >
+        </Pressable>
     );
 }
