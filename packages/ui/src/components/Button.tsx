@@ -1,0 +1,190 @@
+import React from 'react';
+import { Pressable, ActivityIndicator, type PressableProps } from 'react-native';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+} from 'react-native-reanimated';
+import { useTheme } from '@shopify/restyle';
+import { Box } from '../primitives/Box';
+import { Text } from '../primitives/Text';
+import {
+    springs,
+    patterns,
+    triggerHaptic,
+    type Theme,
+} from '@crux/theme';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
+export type ButtonSize = 'small' | 'medium' | 'large';
+
+export interface ButtonProps extends Omit<PressableProps, 'children'> {
+    /** Button text */
+    label: string;
+    /** Visual variant */
+    variant?: ButtonVariant;
+    /** Size preset */
+    size?: ButtonSize;
+    /** Disabled state */
+    disabled?: boolean;
+    /** Loading state (shows spinner) */
+    loading?: boolean;
+    /** Optional left icon */
+    leftIcon?: React.ReactNode;
+    /** Optional right icon */
+    rightIcon?: React.ReactNode;
+    /** Press handler */
+    onPress?: () => void;
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+const getBackgroundColor = (variant: ButtonVariant, disabled: boolean): keyof Theme['colors'] => {
+    if (disabled) return 'interactiveDisabled';
+    switch (variant) {
+        case 'primary':
+            return 'accentBrand';
+        case 'secondary':
+            return 'bgSurface';
+        case 'ghost':
+            return 'transparent';
+        case 'destructive':
+            return 'statusError';
+        default:
+            return 'accentBrand';
+    }
+};
+
+const getTextColor = (variant: ButtonVariant, disabled: boolean): keyof Theme['colors'] => {
+    if (disabled) return 'textMuted';
+    switch (variant) {
+        case 'primary':
+            return 'white';
+        case 'secondary':
+            return 'textPrimary';
+        case 'ghost':
+            return 'textBrand';
+        case 'destructive':
+            return 'white';
+        default:
+            return 'white';
+    }
+};
+
+const getPadding = (size: ButtonSize) => {
+    switch (size) {
+        case 'small':
+            return { paddingVertical: 'xs' as const, paddingHorizontal: 's' as const };
+        case 'medium':
+            return { paddingVertical: 's' as const, paddingHorizontal: 'm' as const };
+        case 'large':
+            return { paddingVertical: 'm' as const, paddingHorizontal: 'l' as const };
+        default:
+            return { paddingVertical: 's' as const, paddingHorizontal: 'm' as const };
+    }
+};
+
+const AnimatedBox = Animated.createAnimatedComponent(Box);
+
+// ============================================================================
+// Component
+// ============================================================================
+
+/**
+ * Button component
+ * 
+ * Theme-aware button with press animations and haptics.
+ * 
+ * @example
+ * <Button
+ *   label="Start Session"
+ *   variant="primary"
+ *   onPress={() => {}}
+ * />
+ */
+export function Button({
+    label,
+    variant = 'primary',
+    size = 'medium',
+    disabled = false,
+    loading = false,
+    leftIcon,
+    rightIcon,
+    onPress,
+    ...pressableProps
+}: ButtonProps) {
+    const theme = useTheme<Theme>();
+    const scale = useSharedValue(1);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+    }));
+
+    const handlePressIn = () => {
+        if (disabled || loading) return;
+        scale.value = withSpring(patterns.buttonPress.pressedScale, springs.snappy);
+        triggerHaptic(patterns.buttonPress.haptic);
+    };
+
+    const handlePressOut = () => {
+        scale.value = withSpring(1, springs.snappy);
+    };
+
+    const handlePress = () => {
+        if (disabled || loading) return;
+        onPress?.();
+    };
+
+    const isDisabled = disabled || loading;
+    const padding = getPadding(size);
+    const bgColor = getBackgroundColor(variant, isDisabled);
+    const textColor = getTextColor(variant, isDisabled);
+
+    return (
+        <Pressable
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            onPress={handlePress}
+            disabled={isDisabled}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isDisabled }}
+            {...pressableProps}
+        >
+            <AnimatedBox
+                style={animatedStyle}
+                backgroundColor={bgColor}
+                paddingVertical={padding.paddingVertical}
+                paddingHorizontal={padding.paddingHorizontal}
+                borderRadius="m"
+                flexDirection="row"
+                alignItems="center"
+                justifyContent="center"
+                gap="xs"
+                borderWidth={variant === 'secondary' ? 1 : 0}
+                borderColor={variant === 'secondary' ? 'borderDefault' : undefined}
+                opacity={isDisabled ? 0.6 : 1}
+            >
+                {loading ? (
+                    <ActivityIndicator
+                        size="small"
+                        color={theme.colors[textColor]}
+                    />
+                ) : (
+                    <>
+                        {leftIcon}
+                        <Text variant="labelLarge" color={textColor}>
+                            {label}
+                        </Text>
+                        {rightIcon}
+                    </>
+                )}
+            </AnimatedBox>
+        </Pressable>
+    );
+}

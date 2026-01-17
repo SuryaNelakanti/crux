@@ -1,0 +1,37 @@
+{
+    "expo": {
+        "name": "Crux",
+        "slug": "crux",
+        "version": "0.0.1",
+        "orientation": "portrait",
+        "icon": "./assets/icon.png",
+        "userInterfaceStyle": "automatic",
+        "scheme": "crux",
+        "splash": {
+            "image": "./assets/splash.png",
+            "resizeMode": "contain",
+            "backgroundColor": "#09090B"
+        },
+        "assetBundlePatterns": [
+            "**/*"
+        ],
+        "ios": {
+            "supportsTablet": false,
+            "bundleIdentifier": "com.crux.app"
+        },
+        "android": {
+            "adaptiveIcon": {
+                "foregroundImage": "./assets/adaptive-icon.png",
+                "backgroundColor": "#09090B"
+            },
+            "package": "com.crux.app"
+        },
+        "plugins": [
+            "expo-router",
+            "expo-font"
+        ],
+        "experiments": {
+            "typedRoutes": true
+        }
+    }
+}

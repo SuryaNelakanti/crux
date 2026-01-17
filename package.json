@@ -1,0 +1,24 @@
+{
+  "name": "crux-monorepo",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm -C apps/mobile start",
+    "ios": "pnpm -C apps/mobile ios",
+    "android": "pnpm -C apps/mobile android",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "supabase:types": "supabase gen types typescript --local > packages/shared/src/database.types.ts"
+  },
+  "devDependencies": {
+    "typescript": "~5.3.3",
+    "eslint": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "prettier": "^3.2.0"
+  }
+}

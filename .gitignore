@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Expo
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# Native
+*.hprof
+android/.gradle/
+android/app/build/
+android/build/
+ios/Pods/
+ios/build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+coverage/
+
+# Supabase
+supabase/.branches
+supabase/.temp
