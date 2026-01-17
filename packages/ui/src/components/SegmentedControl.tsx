@@ -109,7 +109,7 @@ export function SegmentedControl<T extends string>({
                     width={segmentWidth}
                     borderRadius="full"
                     backgroundColor="bgSurfaceRaised"
-                    shadowColor={theme.colors.black}
+                    shadowColor="black"
                     shadowOffset={{ width: 0, height: 4 }}
                     shadowOpacity={0.12}
                     shadowRadius={8}

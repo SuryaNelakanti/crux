@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { Box, Button, Card, Text } from '@crux/ui';
 import { createProblemFromPhoto } from '@/features/problem';
 import { generateAutoMaskForProblem } from '@/features/mask';
@@ -15,9 +16,41 @@ export default function CameraScreen() {
     const cameraRef = useRef<CameraView>(null);
     const [permission, requestPermission] = useCameraPermissions();
     const [processing, setProcessing] = useState(false);
+    const [uploading, setUploading] = useState(false);
+
+    const handleCreateProblem = async (photo: {
+        uri: string;
+        width: number;
+        height: number;
+    }) => {
+        if (!sessionId) return;
+        const processed = await processCapturedPhoto({
+            uri: photo.uri,
+            width: photo.width,
+            height: photo.height,
+        });
+
+        const result = await createProblemFromPhoto({
+            sessionId,
+            localPath: processed.localPath,
+            width: processed.width,
+            height: processed.height,
+            bytes: processed.bytes,
+            metadataJson: {
+                thumbnailPath: processed.thumbnailPath,
+            },
+        });
+
+        void generateAutoMaskForProblem({
+            problemId: result.problemId,
+            photoUri: processed.processingPath,
+        }).catch(() => undefined);
+
+        router.replace(`/problem/${result.problemId}`);
+    };
 
     const handleCapture = async () => {
-        if (!cameraRef.current || !sessionId || processing) return;
+        if (!cameraRef.current || !sessionId || processing || uploading) return;
         try {
             setProcessing(true);
             const photo = await cameraRef.current.takePictureAsync({
@@ -28,32 +61,43 @@ export default function CameraScreen() {
                 setProcessing(false);
                 return;
             }
-
-            const processed = await processCapturedPhoto({
-                uri: photo.uri,
-                width: photo.width,
-                height: photo.height,
-            });
-
-            const result = await createProblemFromPhoto({
-                sessionId,
-                localPath: processed.localPath,
-                width: processed.width,
-                height: processed.height,
-                bytes: processed.bytes,
-                metadataJson: {
-                    thumbnailPath: processed.thumbnailPath,
-                },
-            });
-
-            void generateAutoMaskForProblem({
-                problemId: result.problemId,
-                photoUri: processed.processingPath,
-            }).catch(() => undefined);
-
-            router.replace(`/problem/${result.problemId}`);
+            await handleCreateProblem(photo);
         } finally {
             setProcessing(false);
+        }
+    };
+
+    const handleUpload = async () => {
+        if (!sessionId || processing || uploading) return;
+        try {
+            setUploading(true);
+            const permissionResult =
+                await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permissionResult.granted) {
+                setUploading(false);
+                return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.8,
+                exif: false,
+            });
+            if (result.canceled || result.assets.length === 0) {
+                setUploading(false);
+                return;
+            }
+            const asset = result.assets[0];
+            if (!asset.uri || !asset.width || !asset.height) {
+                setUploading(false);
+                return;
+            }
+            await handleCreateProblem({
+                uri: asset.uri,
+                width: asset.width,
+                height: asset.height,
+            });
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -138,11 +182,18 @@ export default function CameraScreen() {
                             {processing ? 'Processing...' : 'Capture problem'}
                         </Text>
                         <Button
+                            label={uploading ? 'Uploading...' : 'Upload Photo'}
+                            variant="secondary"
+                            size="small"
+                            onPress={handleUpload}
+                            disabled={processing || uploading}
+                        />
+                        <Button
                             label="Cancel"
                             variant="ghost"
                             size="small"
                             onPress={() => router.back()}
-                            disabled={processing}
+                            disabled={processing || uploading}
                         />
                     </Box>
                 </ScreenReveal>

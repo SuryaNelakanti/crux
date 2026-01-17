@@ -5,11 +5,10 @@ import Animated, {
     useSharedValue,
     withSpring,
 } from 'react-native-reanimated';
-import { useTheme } from '@shopify/restyle';
 import { Box } from '../primitives/Box';
 import { Text } from '../primitives/Text';
 import { Badge, type BadgeVariant } from './Badge';
-import { springs, patterns, triggerHaptic, type Theme } from '@crux/theme';
+import { springs, patterns, triggerHaptic } from '@crux/theme';
 
 // ============================================================================
 // Types
@@ -87,7 +86,6 @@ export function ProblemCard({
     onPress,
     compact = false,
 }: ProblemCardProps) {
-    const theme = useTheme<Theme>();
     const scale = useSharedValue(1);
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -120,7 +118,7 @@ export function ProblemCard({
                 overflow="hidden"
                 borderWidth={1}
                 borderColor="borderMuted"
-                shadowColor={theme.colors.black}
+                shadowColor="black"
                 shadowOffset={{ width: 0, height: 10 }}
                 shadowOpacity={0.12}
                 shadowRadius={16}

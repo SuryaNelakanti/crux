@@ -11,7 +11,7 @@ import {
     getUserProblemLog,
     upsertUserProblemLog,
 } from '@/features/problem';
-import { getActiveRouteMaskForProblem } from '@/features/mask';
+import { createBlankMaskForProblem, generateAutoMaskForProblem, getActiveRouteMaskForProblem } from '@/features/mask';
 import { DoodleWave, Sparkle } from '@/components/Doodle';
 import { ScreenReveal } from '@/components/ScreenReveal';
 
@@ -36,6 +36,9 @@ export default function ProblemDetailScreen() {
     const [maskUri, setMaskUri] = useState<string | null>(null);
     const [maskConfidence, setMaskConfidence] = useState<number | null>(null);
     const [maskView, setMaskView] = useState<'photo' | 'mask'>('photo');
+    const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+    const [maskBusy, setMaskBusy] = useState(false);
+    const [maskError, setMaskError] = useState<string | null>(null);
     const [outcome, setOutcome] = useState<Outcome>('tried');
     const [attempts, setAttempts] = useState('');
     const [gradeMin, setGradeMin] = useState('');
@@ -53,12 +56,16 @@ export default function ProblemDetailScreen() {
 
                 setSessionId(result.problem.createdInSessionId ?? null);
                 setImageUri(result.media?.localPath ?? null);
+                if (result.media?.width && result.media?.height) {
+                    setImageSize({ width: result.media.width, height: result.media.height });
+                }
 
                 const mask = await getActiveRouteMaskForProblem(problemId);
                 if (active) {
                     setMaskUri(mask?.localPath ?? null);
                     setMaskConfidence(mask?.confidence ?? null);
                     setMaskView(mask?.localPath ? 'mask' : 'photo');
+                    setMaskError(null);
                 }
 
                 if (result.problem.createdInSessionId) {
@@ -101,6 +108,51 @@ export default function ProblemDetailScreen() {
         });
         setSaving(false);
         router.back();
+    };
+
+    const handleRetryMask = async () => {
+        if (!problemId || !imageUri || maskBusy) return;
+        try {
+            setMaskBusy(true);
+            setMaskError(null);
+            await generateAutoMaskForProblem({
+                problemId,
+                photoUri: imageUri,
+            });
+            const mask = await getActiveRouteMaskForProblem(problemId);
+            setMaskUri(mask?.localPath ?? null);
+            setMaskConfidence(mask?.confidence ?? null);
+            setMaskView(mask?.localPath ? 'mask' : 'photo');
+        } catch (err) {
+            const message =
+                err instanceof Error ? err.message : 'Auto mask failed';
+            setMaskError(message);
+        } finally {
+            setMaskBusy(false);
+        }
+    };
+
+    const handleCreateBlankMask = async () => {
+        if (!problemId || !imageSize || maskBusy) return;
+        try {
+            setMaskBusy(true);
+            setMaskError(null);
+            await createBlankMaskForProblem({
+                problemId,
+                width: imageSize.width,
+                height: imageSize.height,
+            });
+            const mask = await getActiveRouteMaskForProblem(problemId);
+            setMaskUri(mask?.localPath ?? null);
+            setMaskConfidence(mask?.confidence ?? null);
+            setMaskView(mask?.localPath ? 'mask' : 'photo');
+        } catch (err) {
+            const message =
+                err instanceof Error ? err.message : 'Blank mask failed';
+            setMaskError(message);
+        } finally {
+            setMaskBusy(false);
+        }
     };
 
     return (
@@ -172,9 +224,30 @@ export default function ProblemDetailScreen() {
                                 </Box>
                             ) : (
                                 <Card variant="outlined">
-                                    <Text variant="bodyMedium" color="textMuted">
-                                        Generating mask...
-                                    </Text>
+                                    <Box gap="s">
+                                        <Text variant="bodyMedium" color="textMuted">
+                                            {maskBusy ? 'Generating mask...' : 'Mask not ready yet.'}
+                                        </Text>
+                                        <Button
+                                            label={maskBusy ? 'Working...' : 'Retry Auto Mask'}
+                                            variant="secondary"
+                                            size="small"
+                                            onPress={handleRetryMask}
+                                            disabled={maskBusy || !imageUri}
+                                        />
+                                        <Button
+                                            label={maskBusy ? 'Working...' : 'Create Blank Mask'}
+                                            variant="ghost"
+                                            size="small"
+                                            onPress={handleCreateBlankMask}
+                                            disabled={maskBusy || !imageSize}
+                                        />
+                                        {maskError ? (
+                                            <Text variant="bodySmall" color="statusError">
+                                                {maskError}
+                                            </Text>
+                                        ) : null}
+                                    </Box>
                                 </Card>
                             )}
 
@@ -188,7 +261,7 @@ export default function ProblemDetailScreen() {
                                             ? router.push(`/problem/${problemId}/mask`)
                                             : undefined
                                     }
-                                    disabled={!imageUri}
+                                    disabled={!imageUri || !maskUri}
                                 />
                                 {maskConfidence !== null &&
                                     maskConfidence < AUTO_MASK_CONFIDENCE_THRESHOLD && (

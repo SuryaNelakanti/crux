@@ -34,7 +34,6 @@ const mockDb = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getDb(): Promise<any> {
-    console.warn('SQLite is not supported on web. Using mock DB.');
     return mockDb;
 }
 
@@ -43,7 +42,6 @@ export async function initDb(): Promise<{
     db: any;
     localUserId: string;
 }> {
-    console.warn('SQLite is not supported on web. Using mock DB.');
     return { db: mockDb, localUserId: 'web-user-id' };
 }
 

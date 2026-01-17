@@ -5,9 +5,8 @@ import Animated, {
     useSharedValue,
     withSpring,
 } from 'react-native-reanimated';
-import { useTheme } from '@shopify/restyle';
 import { Box, type BoxProps } from '../primitives/Box';
-import { springs, patterns, triggerHaptic, type Theme } from '@crux/theme';
+import { springs, patterns, triggerHaptic } from '@crux/theme';
 
 // ============================================================================
 // Types
@@ -30,15 +29,12 @@ export interface CardProps extends Omit<BoxProps, 'style'> {
 // Helpers
 // ============================================================================
 
-const getVariantStyles = (
-    variant: CardVariant,
-    theme: Theme
-): Partial<BoxProps> => {
+const getVariantStyles = (variant: CardVariant): Partial<BoxProps> => {
     switch (variant) {
         case 'elevated':
             return {
                 backgroundColor: 'bgSurfaceRaised',
-                shadowColor: theme.colors.black,
+                shadowColor: 'black',
                 shadowOffset: { width: 0, height: 10 },
                 shadowOpacity: 0.12,
                 shadowRadius: 16,
@@ -85,7 +81,6 @@ export function Card({
     children,
     ...boxProps
 }: CardProps) {
-    const theme = useTheme<Theme>();
     const scale = useSharedValue(1);
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -101,7 +96,7 @@ export function Card({
         scale.value = withSpring(1, springs.snappy);
     };
 
-    const variantStyles = getVariantStyles(variant, theme);
+    const variantStyles = getVariantStyles(variant);
 
     const cardContent = (
         <AnimatedBox

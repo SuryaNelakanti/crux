@@ -1,4 +1,4 @@
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -103,9 +103,12 @@ export default function HomeScreen() {
                                 <Text variant="headingSmall" color="textPrimary">
                                     Recent sessions
                                 </Text>
-                                <Link href="/design-system" asChild>
-                                    <Button label="Design System" variant="ghost" size="small" />
-                                </Link>
+                                <Button
+                                    label="Design System"
+                                    variant="ghost"
+                                    size="small"
+                                    onPress={() => router.push('/design-system')}
+                                />
                             </Box>
 
                             {loading ? (

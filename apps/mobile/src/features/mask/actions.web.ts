@@ -1,6 +1,6 @@
 import type { HSL } from '@crux/vision';
 import { createRouteMask, getActiveRouteMaskForProblem } from '@/lib/db';
-import { generateMaskFromPhoto, saveMaskToFile } from './processing';
+import { generateMaskFromPhoto, saveMaskToFile } from './processing.web';
 
 export async function generateAutoMaskForProblem(params: {
     problemId: string;
@@ -12,7 +12,6 @@ export async function generateAutoMaskForProblem(params: {
         width: generated.width,
         height: generated.height,
     });
-
     await createRouteMask({
         problemId: params.problemId,
         localPath: saved.localPath,
@@ -39,7 +38,6 @@ export async function generateSeedMaskForProblem(params: {
         width: generated.width,
         height: generated.height,
     });
-
     await createRouteMask({
         problemId: params.problemId,
         localPath: saved.localPath,
@@ -63,7 +61,6 @@ export async function saveEditedMaskForProblem(params: {
         width: params.width,
         height: params.height,
     });
-
     await createRouteMask({
         problemId: params.problemId,
         localPath: saved.localPath,
@@ -87,7 +84,6 @@ export async function createBlankMaskForProblem(params: {
         width: params.width,
         height: params.height,
     });
-
     await createRouteMask({
         problemId: params.problemId,
         localPath: saved.localPath,

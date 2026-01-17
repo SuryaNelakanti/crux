@@ -19,7 +19,8 @@
             "supportsTablet": false,
             "bundleIdentifier": "com.crux.app",
             "infoPlist": {
-                "NSCameraUsageDescription": "Capture problem photos for your climbing journal."
+                "NSCameraUsageDescription": "Capture problem photos for your climbing journal.",
+                "NSPhotoLibraryUsageDescription": "Upload photos to your climbing journal."
             }
         },
         "android": {
@@ -29,7 +30,9 @@
             },
             "package": "com.crux.app",
             "permissions": [
-                "CAMERA"
+                "CAMERA",
+                "READ_MEDIA_IMAGES",
+                "READ_EXTERNAL_STORAGE"
             ]
         },
         "plugins": [

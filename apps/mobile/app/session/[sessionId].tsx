@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView } from 'react-native';
+import { Platform, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@shopify/restyle';
@@ -45,6 +45,7 @@ export default function SessionScreen() {
     }, [sessionId]);
 
     useEffect(() => {
+        if (Platform.OS === 'web') return;
         void runSync();
     }, []);
 

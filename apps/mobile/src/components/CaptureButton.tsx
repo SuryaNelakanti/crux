@@ -5,9 +5,8 @@ import Animated, {
     useSharedValue,
     withSpring,
 } from 'react-native-reanimated';
-import { useTheme } from '@shopify/restyle';
 import { Box } from '@crux/ui';
-import { patterns, springs, triggerHaptic, type Theme } from '@crux/theme';
+import { patterns, springs, triggerHaptic } from '@crux/theme';
 
 const AnimatedBox = Animated.createAnimatedComponent(Box);
 
@@ -18,7 +17,6 @@ export function CaptureButton({
     onPress: () => void;
     disabled?: boolean;
 }) {
-    const theme = useTheme<Theme>();
     const scale = useSharedValue(1);
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -53,7 +51,7 @@ export function CaptureButton({
                 borderWidth={2}
                 borderColor="accentBrand"
                 backgroundColor="bgSurface"
-                shadowColor={theme.colors.black}
+                shadowColor="black"
                 shadowOffset={{ width: 0, height: 8 }}
                 shadowOpacity={0.18}
                 shadowRadius={14}

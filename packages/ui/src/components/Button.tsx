@@ -190,7 +190,7 @@ export function Button({
                 borderWidth={variant === 'ghost' || variant === 'secondary' ? 1 : 0}
                 borderColor={variant === 'ghost' || variant === 'secondary' ? borderColor : undefined}
                 opacity={isDisabled ? 0.6 : 1}
-                shadowColor={showShadow ? theme.colors.black : undefined}
+                shadowColor={showShadow ? 'black' : undefined}
                 shadowOffset={showShadow ? { width: 0, height: 8 } : undefined}
                 shadowOpacity={showShadow ? 0.18 : 0}
                 shadowRadius={showShadow ? 12 : 0}
