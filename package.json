@@ -3,16 +3,18 @@
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "dev": "pnpm -C apps/mobile start",
-    "ios": "pnpm -C apps/mobile ios",
-    "android": "pnpm -C apps/mobile android",
+    "dev": "pnpm -C webapp dev",
+    "dev:mobile": "pnpm -C mobapp start",
+    "ios": "pnpm -C mobapp ios",
+    "android": "pnpm -C mobapp android",
+    "web": "pnpm -C webapp dev",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "supabase:start": "supabase start",
-    "supabase:stop": "supabase stop",
-    "supabase:reset": "supabase db reset",
-    "supabase:types": "supabase gen types typescript --local > packages/shared/src/database.types.ts"
+    "supabase:start": "cd backend && supabase start",
+    "supabase:stop": "cd backend && supabase stop",
+    "supabase:reset": "cd backend && supabase db reset",
+    "supabase:types": "cd backend && supabase gen types typescript --local > ../packages/shared/src/database.types.ts"
   },
   "devDependencies": {
     "typescript": "~5.3.3",

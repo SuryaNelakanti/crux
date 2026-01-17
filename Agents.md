@@ -44,15 +44,21 @@ If the repo doesn't yet match these choices, align it to this baseline rather th
 
 ```
 crux-journal/
-├── apps/
-│   └── mobile/                 # Expo React Native app
-│       ├── app/                # expo-router routes
-│       ├── src/
-│       │   ├── features/       # Feature modules (session, problem, share, mask)
-│       │   ├── components/     # App-specific components (if any)
-│       │   ├── hooks/          # App-specific hooks
-│       │   └── lib/            # App-only helpers (permissions, etc.)
-│       └── assets/             # Fonts, images
+├── backend/
+│   └── supabase/               # Migrations + edge functions
+├── mobapp/                     # Expo React Native app
+│   ├── app/                    # expo-router routes
+│   ├── src/
+│   │   ├── features/           # Feature modules (session, problem, share, mask)
+│   │   ├── components/         # App-specific components (if any)
+│   │   ├── hooks/              # App-specific hooks
+│   │   └── lib/                # App-only helpers (permissions, etc.)
+│   └── assets/                 # Fonts, images
+├── webapp/                     # Web-only frontend (React + Vite)
+│   └── src/
+│       ├── routes/             # Page routes
+│       ├── components/         # UI components
+│       └── lib/                # Supabase + mask helpers
 ├── packages/
 │   ├── theme/                  # Design tokens + motion system (NO components)
 │   │   └── src/
@@ -63,9 +69,6 @@ crux-journal/
 │   ├── shared/                 # Domain types, Zod schemas, constants, utilities
 │   ├── supabase-client/        # Typed Supabase client + storage helpers
 │   └── vision/                 # Mask generation + image processing (pure funcs)
-├── supabase/
-│   ├── migrations/             # Database migrations
-│   └── functions/              # Edge functions
 └── docs/
     ├── PRD.md                  # Product requirements
     ├── decisions.md            # Architecture decision records
@@ -111,12 +114,13 @@ crux-journal/
 ### Import boundaries (enforced via ESLint)
 
 ```
-✅ apps/mobile → packages/*           (screens can import packages)
+✅ mobapp → packages/*               (screens can import packages)
+✅ webapp → packages/*               (web app can import shared packages)
 ✅ packages/ui → packages/theme       (UI uses tokens)
 ✅ packages/supabase-client → packages/shared (client uses types)
 
-❌ apps/mobile → tokens/colors.ts     (screens cannot import raw colors)
-❌ apps/mobile → StyleSheet           (screens cannot define styles)
+❌ mobapp → tokens/colors.ts          (screens cannot import raw colors)
+❌ mobapp → StyleSheet                (screens cannot define styles)
 ❌ packages/shared → apps/*           (shared cannot depend on app)
 ❌ packages/vision → expo/*           (vision must be pure)
 ```
@@ -144,9 +148,13 @@ See `/docs/design-quality.md` for the full checklist.
 - Test: `pnpm test`
 
 ### Mobile app
-- Dev: `pnpm dev` or `pnpm -C apps/mobile start`
+- Dev: `pnpm dev:mobile` or `pnpm -C mobapp start`
 - iOS: `pnpm ios`
 - Android: `pnpm android`
+
+### Web app
+- Dev: `pnpm dev` or `pnpm -C webapp dev`
+- Build: `pnpm -C webapp build`
 
 ### Supabase
 - Start local: `pnpm supabase:start`
@@ -260,7 +268,7 @@ On the UI, show:
 ## Supabase standards
 
 ### Migrations
-- All schema changes via migrations in `/supabase/migrations`.
+- All schema changes via migrations in `/backend/supabase/migrations`.
 - Never "hot-edit" production schema.
 - Keep RLS policies explicit and tested by simple access checks.
 

@@ -46,14 +46,15 @@ let supabaseInstance: SupabaseClient | null = null;
  */
 export function createClient(
     supabaseUrl: string,
-    supabaseAnonKey: string
+    supabaseAnonKey: string,
+    options?: { detectSessionInUrl?: boolean }
 ): SupabaseClient {
     if (!supabaseInstance) {
         supabaseInstance = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
             auth: {
                 autoRefreshToken: true,
                 persistSession: true,
-                detectSessionInUrl: false,
+                detectSessionInUrl: options?.detectSessionInUrl ?? false,
             },
         });
     }

@@ -1,0 +1,63 @@
+# Web App Spec (MVP)
+
+## Goals
+- Provide a web-first UI for the core capture loop: session -> problem -> mask -> log.
+- Use Supabase directly for storage + DB operations (no Expo).
+- Mirror the mobile MVP flows so QA can validate end-to-end behavior on web.
+
+## Non-Goals (MVP)
+- Full offline-first persistence in the browser (IndexedDB sync queue).
+- Advanced analytics or dashboards.
+- Collaborative editing beyond shared problem membership.
+
+## Primary Flows
+1. Auth (email magic link)
+   - Enter email -> receive magic link -> session is created in-app.
+2. Session list
+   - List recent sessions with counts and status.
+   - Start session button.
+3. Session detail
+   - Upload problem photo.
+   - List problems with outcome + grade chips.
+4. Problem detail
+   - View photo with mask overlay toggle.
+   - Log outcome, attempts, grade range, note.
+   - Edit mask (brush add/erase) and save as a new mask version.
+
+## Routes
+- `/` Sessions
+- `/session/:sessionId` Session detail
+- `/problem/:problemId` Problem detail
+- `/problem/:problemId/mask` Mask editor
+- `/auth` Login
+
+## Data + Backend Integration
+- Supabase is the source of truth.
+- Writes are optimistic in UI but always persisted to Supabase tables and storage.
+- Media uploads use deterministic storage paths from `@crux/shared`.
+- Events are appended for each state change (session started/ended, problem created, media added, route mask created/updated, log upserted).
+
+## Media Pipeline (Web)
+1. User uploads a photo file.
+2. Create problem + media rows in Supabase.
+3. Upload photo to storage bucket.
+4. Generate mask in browser using `@crux/vision` (canvas pixel read).
+5. Upload mask PNG to storage bucket.
+6. Create route mask version row + media row.
+
+## Mask Editing (Web)
+- Canvas-based overlay.
+- Brush add/erase, adjustable size.
+- Save writes a new mask version and uploads PNG.
+
+## UI System
+- Custom CSS variables for color, spacing, radius, and motion.
+- High-contrast, premium aesthetic with subtle gradients and hand-drawn accents.
+- Motion: page reveal, list stagger, hover depth (CSS keyframes).
+
+## Environment
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+## QA Signal
+- A documented repro path in `docs/repro.md` for web.

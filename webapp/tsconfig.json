@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@crux/theme": ["../packages/theme/src"],
+      "@crux/ui": ["../packages/ui/src"],
+      "@crux/shared": ["../packages/shared/src"],
+      "@crux/supabase-client": ["../packages/supabase-client/src"],
+      "@crux/vision": ["../packages/vision/src"]
+    }
+  },
+  "include": ["src"]
+}

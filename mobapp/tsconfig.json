@@ -8,19 +8,19 @@
                 "./src/*"
             ],
             "@crux/theme": [
-                "../../packages/theme/src"
+                "../packages/theme/src"
             ],
             "@crux/ui": [
-                "../../packages/ui/src"
+                "../packages/ui/src"
             ],
             "@crux/shared": [
-                "../../packages/shared/src"
+                "../packages/shared/src"
             ],
             "@crux/supabase-client": [
-                "../../packages/supabase-client/src"
+                "../packages/supabase-client/src"
             ],
             "@crux/vision": [
-                "../../packages/vision/src"
+                "../packages/vision/src"
             ]
         }
     },

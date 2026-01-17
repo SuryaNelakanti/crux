@@ -15,7 +15,7 @@ Crux needs to share code between the mobile app and potentially future platforms
 
 **Decision:**
 Use pnpm workspaces with a monorepo structure:
-- `apps/mobile` - Expo React Native app
+- `mobapp` - Expo React Native app
 - `packages/theme` - Design tokens and motion system
 - `packages/ui` - Reusable UI components
 - `packages/shared` - Domain types, schemas, utilities
@@ -199,3 +199,27 @@ editor that saves new `route_masks` versions.
 - Masking works offline and is deterministic across devices
 - Edits create new versions without mutating prior masks
 - No server dependency for initial mask generation
+
+---
+
+## ADR-009: Separate webapp, mobapp, backend folders
+
+**Date:** 2026-01-18
+
+**Status:** Accepted
+
+**Context:**
+Testing will focus on a web UI while the mobile app continues to evolve. We need
+clear separation between backend (Supabase), the web frontend, and the mobile
+frontend so each can be worked on independently.
+
+**Decision:**
+Introduce top-level folders for:
+- `backend/` (Supabase migrations + functions)
+- `webapp/` (React + Vite web-only UI)
+- `mobapp/` (Expo React Native app)
+
+**Consequences:**
+- Easier parallel development and CI targeting per surface
+- Web app can be iterated quickly without Expo web constraints
+- Workspace scripts and documentation must reference the new paths
