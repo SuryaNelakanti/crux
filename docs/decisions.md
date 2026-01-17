@@ -176,3 +176,26 @@ upserts rows, and pulls shared problem changes. Camera capture uses Expo Camera 
 - Offline captures are durable and syncable without network
 - Access control is enforced at the database level
 - Sync logic is explicit and testable, with clear failure states
+
+---
+
+## ADR-008: On-device mask generation + Skia editor
+
+**Date:** 2026-01-17
+
+**Status:** Accepted
+
+**Context:**
+MVP requires fast, offline mask generation and quick corrections. We need a
+deterministic pipeline that works without ML training and a lightweight editor
+for brush add/remove that persists versions.
+
+**Decision:**
+Implement a pure HSL clustering pipeline in `@crux/vision` for auto masks.
+Use Skia to read pixels on-device, encode mask PNGs, and provide a brush-based
+editor that saves new `route_masks` versions.
+
+**Consequences:**
+- Masking works offline and is deterministic across devices
+- Edits create new versions without mutating prior masks
+- No server dependency for initial mask generation

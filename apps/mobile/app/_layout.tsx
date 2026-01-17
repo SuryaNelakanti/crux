@@ -34,13 +34,15 @@ export default function RootLayout() {
     const [themeName, setThemeName] = useState<ThemeName>('dark');
 
     // Load custom fonts
-    const [fontsLoaded] = useFonts({
-        'Inter': require('../assets/fonts/Inter-Regular.ttf'),
-        'Inter-Medium': require('../assets/fonts/Inter-Medium.ttf'),
-        'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
-        'Inter-Bold': require('../assets/fonts/Inter-Bold.ttf'),
-        'JetBrainsMono': require('../assets/fonts/JetBrainsMono-Regular.ttf'),
-    });
+    // Load custom fonts
+    // const [fontsLoaded] = useFonts({
+    //     'Inter': require('../assets/fonts/Inter-Regular.ttf'),
+    //     'Inter-Medium': require('../assets/fonts/Inter-Medium.ttf'),
+    //     'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
+    //     'Inter-Bold': require('../assets/fonts/Inter-Bold.ttf'),
+    //     'JetBrainsMono': require('../assets/fonts/JetBrainsMono-Regular.ttf'),
+    // });
+    const fontsLoaded = true; // Temporary bypass
 
     const toggleTheme = () => {
         setThemeName((prev) => (prev === 'dark' ? 'light' : 'dark'));

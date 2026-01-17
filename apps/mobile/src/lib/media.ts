@@ -15,6 +15,9 @@ export interface ProcessedPhoto {
     height: number;
     bytes: number | null;
     thumbnailPath: string | null;
+    processingPath: string;
+    processingWidth: number;
+    processingHeight: number;
 }
 
 async function ensurePhotoDir(): Promise<void> {
@@ -54,12 +57,34 @@ export async function processCapturedPhoto(params: {
     const thumbnailPath = `${PHOTO_DIR}/${id}_thumb.jpg`;
     await FileSystem.moveAsync({ from: thumbnail.uri, to: thumbnailPath });
 
+    let processingPath = localPath;
+    let processingWidth = resized.width ?? targetWidth;
+    let processingHeight = resized.height ?? params.height;
+
+    if (processingWidth > IMAGE_PROCESSING_MAX_WIDTH) {
+        const processing = await ImageManipulator.manipulateAsync(
+            localPath,
+            [{ resize: { width: IMAGE_PROCESSING_MAX_WIDTH } }],
+            {
+                compress: IMAGE_COMPRESSION_QUALITY,
+                format: ImageManipulator.SaveFormat.JPEG,
+            }
+        );
+        processingPath = `${PHOTO_DIR}/${id}_proc.jpg`;
+        await FileSystem.moveAsync({ from: processing.uri, to: processingPath });
+        processingWidth = processing.width ?? IMAGE_PROCESSING_MAX_WIDTH;
+        processingHeight = processing.height ?? processingHeight;
+    }
+
     return {
         localPath,
         width: resized.width ?? targetWidth,
         height: resized.height ?? params.height,
         bytes: info.exists ? info.size ?? null : null,
         thumbnailPath,
+        processingPath,
+        processingWidth,
+        processingHeight,
     };
 }
 

@@ -108,7 +108,12 @@ export default function SessionScreen() {
                                 <ProblemCard
                                     key={problem.problemId}
                                     imageSource={{ uri: problem.imageUri }}
-                                    showMask={false}
+                                    maskSource={
+                                        problem.maskUri
+                                            ? { uri: problem.maskUri }
+                                            : undefined
+                                    }
+                                    showMask={Boolean(problem.maskUri)}
                                     outcome={problem.outcome ?? undefined}
                                     gradeLabel={problem.gradeLabel ?? undefined}
                                     attempts={problem.attemptsCount ?? undefined}

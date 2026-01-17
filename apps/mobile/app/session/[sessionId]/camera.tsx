@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Box, Button, Text, Card } from '@crux/ui';
 import { createProblemFromPhoto } from '@/features/problem';
+import { generateAutoMaskForProblem } from '@/features/mask';
 import { processCapturedPhoto } from '@/lib/media';
 
 export default function CameraScreen() {
@@ -41,6 +42,11 @@ export default function CameraScreen() {
                     thumbnailPath: processed.thumbnailPath,
                 },
             });
+
+            void generateAutoMaskForProblem({
+                problemId: result.problemId,
+                photoUri: processed.processingPath,
+            }).catch(() => undefined);
 
             router.replace(`/problem/${result.problemId}`);
         } finally {

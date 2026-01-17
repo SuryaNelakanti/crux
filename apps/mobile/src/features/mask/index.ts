@@ -7,6 +7,16 @@
  * - Seed color selection
  * - Mask versioning
  */
-
-// Re-export from submodules when implemented
-export { };
+export {
+    generateAutoMaskForProblem,
+    generateSeedMaskForProblem,
+    saveEditedMaskForProblem,
+    getActiveRouteMaskForProblem,
+} from './actions';
+export {
+    applyBrushToMask,
+    buildMaskRgba,
+    createMaskImage,
+    loadMaskPixels,
+    maskTint,
+} from './processing';

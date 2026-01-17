@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Box, Button, Card, ProblemCard, SegmentedControl, Text, TextField } from '@crux/ui';
-import type { Outcome } from '@crux/shared';
+import { AUTO_MASK_CONFIDENCE_THRESHOLD, type Outcome } from '@crux/shared';
 import {
     getProblemById,
     getUserProblemLog,
     upsertUserProblemLog,
 } from '@/features/problem';
+import { getActiveRouteMaskForProblem } from '@/features/mask';
 
 const OUTCOME_OPTIONS = [
     { value: 'flash', label: 'Flash' },
@@ -16,11 +18,19 @@ const OUTCOME_OPTIONS = [
     { value: 'project', label: 'Project' },
 ] as const;
 
+const MASK_VIEW_OPTIONS = [
+    { value: 'photo', label: 'Photo' },
+    { value: 'mask', label: 'Mask' },
+] as const;
+
 export default function ProblemDetailScreen() {
     const router = useRouter();
     const { problemId } = useLocalSearchParams<{ problemId: string }>();
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [imageUri, setImageUri] = useState<string | null>(null);
+    const [maskUri, setMaskUri] = useState<string | null>(null);
+    const [maskConfidence, setMaskConfidence] = useState<number | null>(null);
+    const [maskView, setMaskView] = useState<'photo' | 'mask'>('photo');
     const [outcome, setOutcome] = useState<Outcome>('tried');
     const [attempts, setAttempts] = useState('');
     const [gradeMin, setGradeMin] = useState('');
@@ -28,36 +38,45 @@ export default function ProblemDetailScreen() {
     const [note, setNote] = useState('');
     const [saving, setSaving] = useState(false);
 
-    useEffect(() => {
-        let active = true;
-        const load = async () => {
-            if (!problemId) return;
-            const result = await getProblemById(problemId);
-            if (!result || !active) return;
+    useFocusEffect(
+        useCallback(() => {
+            let active = true;
+            const load = async () => {
+                if (!problemId) return;
+                const result = await getProblemById(problemId);
+                if (!result || !active) return;
 
-            setSessionId(result.problem.createdInSessionId ?? null);
-            setImageUri(result.media?.localPath ?? null);
+                setSessionId(result.problem.createdInSessionId ?? null);
+                setImageUri(result.media?.localPath ?? null);
 
-            if (result.problem.createdInSessionId) {
-                const log = await getUserProblemLog(
-                    problemId,
-                    result.problem.createdInSessionId
-                );
-                if (log && active) {
-                    setOutcome(log.outcome);
-                    setAttempts(log.attemptsCount?.toString() ?? '');
-                    setGradeMin(log.gradeMin?.toString() ?? '');
-                    setGradeMax(log.gradeMax?.toString() ?? '');
-                    setNote(log.note ?? '');
+                const mask = await getActiveRouteMaskForProblem(problemId);
+                if (active) {
+                    setMaskUri(mask?.localPath ?? null);
+                    setMaskConfidence(mask?.confidence ?? null);
+                    setMaskView(mask?.localPath ? 'mask' : 'photo');
                 }
-            }
-        };
 
-        void load();
-        return () => {
-            active = false;
-        };
-    }, [problemId]);
+                if (result.problem.createdInSessionId) {
+                    const log = await getUserProblemLog(
+                        problemId,
+                        result.problem.createdInSessionId
+                    );
+                    if (log && active) {
+                        setOutcome(log.outcome);
+                        setAttempts(log.attemptsCount?.toString() ?? '');
+                        setGradeMin(log.gradeMin?.toString() ?? '');
+                        setGradeMax(log.gradeMax?.toString() ?? '');
+                        setNote(log.note ?? '');
+                    }
+                }
+            };
+
+            void load();
+            return () => {
+                active = false;
+            };
+        }, [problemId])
+    );
 
     const handleSave = async () => {
         if (!problemId || !sessionId) return;
@@ -94,7 +113,8 @@ export default function ProblemDetailScreen() {
                     {imageUri ? (
                         <ProblemCard
                             imageSource={{ uri: imageUri }}
-                            showMask={false}
+                            maskSource={maskUri ? { uri: maskUri } : undefined}
+                            showMask={maskView === 'mask'}
                             outcome={outcome}
                         />
                     ) : (
@@ -103,6 +123,48 @@ export default function ProblemDetailScreen() {
                         </Text>
                     )}
                 </Card>
+
+                {maskUri ? (
+                    <Box gap="s">
+                        <Text variant="labelLarge" color="textSecondary">
+                            Mask overlay
+                        </Text>
+                        <SegmentedControl<'photo' | 'mask'>
+                            options={[...MASK_VIEW_OPTIONS]}
+                            value={maskView}
+                            onChange={setMaskView}
+                        />
+                    </Box>
+                ) : (
+                    <Card variant="outlined">
+                        <Text variant="bodyMedium" color="textMuted">
+                            Generating mask...
+                        </Text>
+                    </Card>
+                )}
+
+                <Box gap="s">
+                    <Button
+                        label="Edit Mask"
+                        variant="secondary"
+                        size="medium"
+                        onPress={() =>
+                            problemId
+                                ? router.push(`/problem/${problemId}/mask`)
+                                : undefined
+                        }
+                        disabled={!imageUri}
+                    />
+                    {maskConfidence !== null &&
+                        maskConfidence < AUTO_MASK_CONFIDENCE_THRESHOLD && (
+                            <Card variant="outlined">
+                                <Text variant="bodyMedium" color="textMuted">
+                                    Mask confidence is low. Quick edits usually
+                                    fix it.
+                                </Text>
+                            </Card>
+                        )}
+                </Box>
 
                 <Box gap="m">
                     <Text variant="headingSmall" color="textPrimary">

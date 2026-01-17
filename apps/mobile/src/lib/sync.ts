@@ -43,6 +43,7 @@ import {
     upsertRemoteRouteMasks,
     upsertRemoteUserProblemLogs,
 } from './db';
+import { flushOutboxEvents } from './sync/outbox';
 import { getSupabaseClient } from './supabase';
 
 // Type definitions for Supabase row responses
@@ -157,26 +158,13 @@ async function uploadPendingMedia(): Promise<void> {
 }
 
 async function flushPendingEvents(): Promise<void> {
-    const items = await getPendingOutboxEvents();
-    for (const item of items) {
-        try {
-            const event = await getEventById(item.eventId);
-            if (!event) {
-                await removeOutboxEvent(item.id);
-                continue;
-            }
-            await insertEvents([event]);
-            await removeOutboxEvent(item.id);
-        } catch (error) {
-            const message =
-                error instanceof Error ? error.message : 'event flush failed';
-            await markOutboxEventFailed(
-                item.id,
-                item.retryCount + 1,
-                message
-            );
-        }
-    }
+    await flushOutboxEvents({
+        getPendingOutboxEvents,
+        getEventById,
+        insertEvents,
+        removeOutboxEvent,
+        markOutboxEventFailed,
+    });
 }
 
 async function upsertLocalEntities(): Promise<void> {

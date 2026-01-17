@@ -12,6 +12,7 @@ import { getDb, getLocalUserId, initDb, parseJson } from './schema';
 export interface ProblemCardItem {
     problemId: string;
     imageUri: string | null;
+    maskUri: string | null;
     outcome: Outcome | null;
     gradeLabel: string | null;
     attemptsCount: number | null;
@@ -108,6 +109,7 @@ export async function getProblemCardsForSession(
     const rows = await db.getAllAsync<{
         problem_id: string;
         image_uri: string | null;
+        mask_uri: string | null;
         outcome: Outcome | null;
         grade_min: number | null;
         grade_max: number | null;
@@ -117,12 +119,25 @@ export async function getProblemCardsForSession(
         select
             p.id as problem_id,
             m.local_path as image_uri,
+            mm.local_path as mask_uri,
             l.outcome,
             l.grade_min,
             l.grade_max,
             l.attempts_count
         from problems p
         left join media m on m.id = p.primary_media_id
+        left join (
+            select rm.problem_id, rm.mask_media_id, rm.version
+              from route_masks rm
+              join (
+                    select problem_id, max(version) as max_version
+                      from route_masks
+                     group by problem_id
+                   ) latest
+                on latest.problem_id = rm.problem_id
+               and latest.max_version = rm.version
+        ) active on active.problem_id = p.id
+        left join media mm on mm.id = active.mask_media_id
         left join user_problem_logs l
           on l.problem_id = p.id
          and l.user_id = ?
@@ -135,11 +150,12 @@ export async function getProblemCardsForSession(
     return rows.map((row) => ({
         problemId: row.problem_id,
         imageUri: row.image_uri ?? null,
+        maskUri: row.mask_uri ?? null,
         outcome: row.outcome ?? null,
         gradeLabel:
             row.grade_min === null && row.grade_max === null
                 ? null
-                : formatGradeRange(row.grade_min, row.grade_max, 'v_scale'),
+            : formatGradeRange(row.grade_min, row.grade_max, 'v_scale'),    
         attemptsCount: row.attempts_count ?? null,
     }));
 }
