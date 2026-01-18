@@ -1,9 +1,13 @@
 import { generateMask, type HSL } from '@crux/vision';
 import { readImagePixels } from './image';
 
-const MASK_TINT = { r: 27, g: 175, b: 161, a: 180 };
+const MASK_TINT = { r: 47, g: 191, b: 156, a: 235 };
 
-export async function generateMaskFromPhoto(params: { uri: string; seedColor?: HSL }): Promise<{
+export async function generateMaskFromPhoto(params: {
+  uri: string;
+  seedColor?: HSL;
+  maxWidth?: number;
+}): Promise<{
   mask: Uint8Array;
   width: number;
   height: number;
@@ -11,7 +15,10 @@ export async function generateMaskFromPhoto(params: { uri: string; seedColor?: H
   confidence: number;
   method: 'auto' | 'seed-color';
 }> {
-  const { pixels, width, height } = await readImagePixels({ uri: params.uri });
+  const { pixels, width, height } = await readImagePixels({
+    uri: params.uri,
+    maxWidth: params.maxWidth,
+  });
   const result = generateMask({
     pixels,
     width,

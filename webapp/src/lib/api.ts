@@ -5,6 +5,7 @@ import {
   generateId,
   type Outcome,
 } from '@crux/shared';
+import { type HSL } from '@crux/vision';
 import { insertEvents, uploadMask, uploadPhoto } from '@crux/supabase-client';
 import { preparePhotoForUpload } from './image';
 import { buildMaskRgba, generateMaskFromPhoto, rgbaToBlob } from './mask';
@@ -88,12 +89,21 @@ type LogRow = {
   note: string | null;
 };
 
-const getPublicUrl = (path: string) => {
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
+const getSignedUrl = async (path: string): Promise<string | null> => {
   const client = getSupabaseClient();
   const [bucket, ...parts] = path.split('/');
   const key = parts.join('/');
-  const { data } = client.storage.from(bucket).getPublicUrl(key);
-  return data.publicUrl ?? null;
+  if (!bucket || !key) return null;
+  const { data, error } = await client.storage
+    .from(bucket)
+    .createSignedUrl(key, SIGNED_URL_TTL_SECONDS);
+  if (error) {
+    console.warn('[getSignedUrl] Failed to sign storage path', { path, error: error.message });
+    return null;
+  }
+  return data?.signedUrl ?? null;
 };
 
 const buildEvent = (params: Omit<AppEvent, 'id' | 'clientTs' | 'serverTs'>): AppEvent => ({
@@ -268,27 +278,31 @@ export async function fetchProblemsForSession(sessionId: string): Promise<Proble
   const maskRows = (routeMasks ?? []) as RouteMaskRow[];
   const logRows = (logs ?? []) as LogRow[];
 
-  return problemRows.map((problem) => {
-    const primaryMedia = mediaRows.find((entry) => entry.id === problem.primary_media_id);
-    const mask = maskRows
-      .filter((entry) => entry.problem_id === problem.id)
-      .sort((a, b) => b.version - a.version)[0];
-    const maskMedia = mask ? mediaRows.find((entry) => entry.id === mask.mask_media_id) : null;
-    const log = logRows.find((entry) => entry.problem_id === problem.id);
-    const gradeLabel =
-      log && (log.grade_min !== null || log.grade_max !== null)
-        ? formatGradeRange(log.grade_min, log.grade_max, 'v_scale')
-        : null;
+  return Promise.all(
+    problemRows.map(async (problem) => {
+      const primaryMedia = mediaRows.find((entry) => entry.id === problem.primary_media_id);
+      const mask = maskRows
+        .filter((entry) => entry.problem_id === problem.id)
+        .sort((a, b) => b.version - a.version)[0];
+      const maskMedia = mask ? mediaRows.find((entry) => entry.id === mask.mask_media_id) : null;
+      const log = logRows.find((entry) => entry.problem_id === problem.id);
+      const gradeLabel =
+        log && (log.grade_min !== null || log.grade_max !== null)
+          ? formatGradeRange(log.grade_min, log.grade_max, 'v_scale')
+          : null;
 
-    return {
-      problemId: problem.id,
-      imageUrl: primaryMedia?.storage_path ? getPublicUrl(primaryMedia.storage_path) : null,
-      maskUrl: maskMedia?.storage_path ? getPublicUrl(maskMedia.storage_path) : null,
-      outcome: log?.outcome ?? null,
-      gradeLabel,
-      attemptsCount: log?.attempts_count ?? null,
-    };
-  });
+      return {
+        problemId: problem.id,
+        imageUrl: primaryMedia?.storage_path
+          ? await getSignedUrl(primaryMedia.storage_path)
+          : null,
+        maskUrl: maskMedia?.storage_path ? await getSignedUrl(maskMedia.storage_path) : null,
+        outcome: log?.outcome ?? null,
+        gradeLabel,
+        attemptsCount: log?.attempts_count ?? null,
+      };
+    })
+  );
 }
 
 export async function fetchProblemDetail(problemId: string): Promise<ProblemDetail | null> {
@@ -327,8 +341,8 @@ export async function fetchProblemDetail(problemId: string): Promise<ProblemDeta
   return {
     id: problem.id,
     sessionId: problem.created_in_session_id,
-    imageUrl: photo?.storage_path ? getPublicUrl(photo.storage_path) : null,
-    maskUrl: maskMedia?.storage_path ? getPublicUrl(maskMedia.storage_path) : null,
+    imageUrl: photo?.storage_path ? await getSignedUrl(photo.storage_path) : null,
+    maskUrl: maskMedia?.storage_path ? await getSignedUrl(maskMedia.storage_path) : null,
     maskConfidence: mask?.confidence ?? null,
     maskMethod: mask?.method ?? null,
     log: log
@@ -546,6 +560,9 @@ export async function saveMaskVersion(params: {
   mask: Uint8Array;
   width: number;
   height: number;
+  method?: 'auto' | 'seed-color' | 'manual-edit' | 'color-dominant';
+  seedColor?: HSL | null;
+  confidence?: number | null;
 }): Promise<string> {
   const client = getSupabaseClient();
   const user = await getAuthUser();
@@ -582,14 +599,17 @@ export async function saveMaskVersion(params: {
   if (mediaError) throw new Error(mediaError.message);
 
   const routeMaskId = generateId();
+  const method = params.method ?? 'manual-edit';
+  const confidence = params.confidence ?? null;
+  const seedColor = params.seedColor ?? null;
   const { error } = await client.from('route_masks').insert({
     id: routeMaskId,
     problem_id: params.problemId,
     version: nextVersion,
     mask_media_id: maskMediaId,
-    method: 'manual-edit',
-    seed_color_json: null,
-    confidence: null,
+    method,
+    seed_color_json: seedColor,
+    confidence,
     created_by: user.id,
     created_at: now.toISOString(),
   });
@@ -611,7 +631,8 @@ export async function saveMaskVersion(params: {
       payloadJson: {
         problemId: params.problemId,
         routeMaskId,
-        method: 'manual-edit',
+        method,
+        confidence,
       },
     }),
   ]);

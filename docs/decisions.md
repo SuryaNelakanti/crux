@@ -223,3 +223,26 @@ Introduce top-level folders for:
 - Easier parallel development and CI targeting per surface
 - Web app can be iterated quickly without Expo web constraints
 - Workspace scripts and documentation must reference the new paths
+
+---
+
+## ADR-010: Seed-color re-mask in web editor + stronger mask visibility
+
+**Date:** 2026-01-18
+
+**Status:** Accepted
+
+**Context:**
+Auto mask works for most photos, but when hold color is off, users had no quick
+way to re-run the mask without brushing everything. The mask overlay was also
+too subtle to read on the photo.
+
+**Decision:**
+Add a `Pick hold color` action in the web mask editor that samples a pixel and
+re-runs the auto mask with a seed color. Increase overlay visibility with a
+stronger tint and normal blend mode.
+
+**Consequences:**
+- Users can re-mask quickly without full manual edits
+- Saved mask versions capture whether they were auto/seed/manual
+- Overlay readability improves across photo lighting conditions

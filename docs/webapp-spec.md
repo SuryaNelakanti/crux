@@ -50,6 +50,7 @@
 ## Mask Editing (Web)
 - Canvas-based overlay.
 - Brush add/erase, adjustable size.
+- Pick hold color to re-run auto mask before brushing.
 - Save writes a new mask version and uploads PNG.
 
 ## UI System

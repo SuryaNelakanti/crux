@@ -405,8 +405,8 @@ textarea {
 .mask-overlay {
   position: absolute;
   inset: 0;
-  mix-blend-mode: screen;
-  opacity: 0.65;
+  mix-blend-mode: normal;
+  opacity: 0.85;
 }
 
 .footer-actions {

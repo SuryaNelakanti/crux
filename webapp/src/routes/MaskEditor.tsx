@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { type HSL, rgbToHsl } from '@crux/vision';
 import { DoodleArrow, DoodleWave, Sparkle } from '@/components/Doodle';
 import { Badge, Button, Card, Segmented } from '@/components/ui';
 import { fetchProblemDetail, saveMaskVersion } from '@/lib/api';
-import { applyBrushToMask, loadMaskPixelsFromUrl, maskTint } from '@/lib/mask';
+import { readImagePixels } from '@/lib/image';
+import {
+  applyBrushToMask,
+  buildMaskRgba,
+  generateMaskFromPhoto,
+  loadMaskPixelsFromUrl,
+  maskTint,
+} from '@/lib/mask';
 
 const MODE_OPTIONS = [
   { value: 'add', label: 'Add' },
@@ -29,6 +37,18 @@ export function MaskEditorRoute() {
   const [saving, setSaving] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isPickingColor, setIsPickingColor] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [photoSample, setPhotoSample] = useState<{
+    pixels: Uint8ClampedArray;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [maskMeta, setMaskMeta] = useState<{
+    method: 'auto' | 'seed-color' | 'manual-edit' | 'color-dominant';
+    seedColor?: HSL;
+    confidence?: number | null;
+  }>({ method: 'manual-edit' });
 
   useEffect(() => {
     const load = async () => {
@@ -37,6 +57,17 @@ export function MaskEditorRoute() {
       if (!detail) return;
       setSessionId(detail.sessionId);
       setPhotoUrl(detail.imageUrl);
+      setPhotoSample(null);
+      if (
+        detail.maskMethod === 'auto' ||
+        detail.maskMethod === 'seed-color' ||
+        detail.maskMethod === 'manual-edit' ||
+        detail.maskMethod === 'color-dominant'
+      ) {
+        setMaskMeta({ method: detail.maskMethod, confidence: detail.maskConfidence });
+      } else {
+        setMaskMeta({ method: 'manual-edit' });
+      }
       if (detail.maskUrl) {
         const loaded = await loadMaskPixelsFromUrl(detail.maskUrl);
         setMaskData(loaded.mask);
@@ -104,6 +135,7 @@ export function MaskEditorRoute() {
       mode,
       tint: maskTint,
     });
+    setMaskMeta((prev) => (prev.method === 'manual-edit' ? prev : { method: 'manual-edit' }));
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
     const imageData = new ImageData(
@@ -115,6 +147,10 @@ export function MaskEditorRoute() {
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (isPickingColor) {
+      void handlePickColor(event.clientX, event.clientY);
+      return;
+    }
     setIsDrawing(true);
     paintAt(event.clientX, event.clientY);
   };
@@ -128,16 +164,80 @@ export function MaskEditorRoute() {
     setIsDrawing(false);
   };
 
+  const ensurePhotoSample = async () => {
+    if (!photoUrl || !maskSize) return null;
+    if (photoSample) return photoSample;
+    const sample = await readImagePixels({ uri: photoUrl, maxWidth: maskSize.width });
+    setPhotoSample(sample);
+    return sample;
+  };
+
+  const handlePickColor = async (clientX: number, clientY: number) => {
+    if (!canvasRef.current || !photoUrl || !maskSize) return;
+    setIsRegenerating(true);
+    try {
+      const sample = await ensurePhotoSample();
+      if (!sample) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = Math.round(((clientX - rect.left) / rect.width) * sample.width);
+      const y = Math.round(((clientY - rect.top) / rect.height) * sample.height);
+      const clampedX = Math.min(sample.width - 1, Math.max(0, x));
+      const clampedY = Math.min(sample.height - 1, Math.max(0, y));
+      const offset = (clampedY * sample.width + clampedX) * 4;
+      const seedColor = rgbToHsl({
+        r: sample.pixels[offset],
+        g: sample.pixels[offset + 1],
+        b: sample.pixels[offset + 2],
+      });
+
+      const result = await generateMaskFromPhoto({
+        uri: photoUrl,
+        seedColor,
+        maxWidth: sample.width,
+      });
+      const rgba = buildMaskRgba(result.mask, result.width, result.height);
+      setMaskData(result.mask);
+      setRgbaData(rgba);
+      setMaskSize({ width: result.width, height: result.height });
+      setMaskMeta({ method: result.method, seedColor: result.seedColor, confidence: result.confidence });
+    } finally {
+      setIsRegenerating(false);
+      setIsPickingColor(false);
+    }
+  };
+
+  const handleAutoMask = async () => {
+    if (!photoUrl || !maskSize) return;
+    setIsRegenerating(true);
+    try {
+      const sample = await ensurePhotoSample();
+      const maxWidth = sample?.width ?? maskSize.width;
+      const result = await generateMaskFromPhoto({ uri: photoUrl, maxWidth });
+      const rgba = buildMaskRgba(result.mask, result.width, result.height);
+      setMaskData(result.mask);
+      setRgbaData(rgba);
+      setMaskSize({ width: result.width, height: result.height });
+      setMaskMeta({ method: result.method, seedColor: result.seedColor, confidence: result.confidence });
+    } finally {
+      setIsRegenerating(false);
+      setIsPickingColor(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!problemId || !maskData || !maskSize || saving) return;
     setSaving(true);
     try {
+      const method = maskMeta.method ?? 'manual-edit';
       await saveMaskVersion({
         problemId,
         sessionId,
         mask: maskData,
         width: maskSize.width,
         height: maskSize.height,
+        method,
+        seedColor: method === 'manual-edit' ? null : maskMeta.seedColor ?? null,
+        confidence: method === 'manual-edit' ? null : maskMeta.confidence ?? null,
       });
       navigate(`/problem/${problemId}`);
     } finally {
@@ -176,7 +276,12 @@ export function MaskEditorRoute() {
                 <canvas
                   ref={canvasRef}
                   className="mask-overlay"
-                  style={{ width: '100%', height: '100%', touchAction: 'none' }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    touchAction: 'none',
+                    cursor: isPickingColor ? 'crosshair' : 'default',
+                  }}
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
                   onPointerUp={handlePointerUp}
@@ -208,6 +313,46 @@ export function MaskEditorRoute() {
                 Brush size
               </div>
               <Segmented options={[...SIZE_OPTIONS]} value={brushSize} onChange={setBrushSize} />
+            </div>
+            <div style={{ marginTop: '16px' }}>
+              <div className="muted" style={{ fontSize: '12px', marginBottom: '6px' }}>
+                Auto mask
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <Button
+                  variant={isPickingColor ? 'primary' : 'secondary'}
+                  onClick={() => setIsPickingColor((value) => !value)}
+                  disabled={isRegenerating}
+                >
+                  {isPickingColor ? 'Tap a hold…' : 'Pick hold color'}
+                </Button>
+                <Button variant="ghost" onClick={() => void handleAutoMask()} disabled={isRegenerating}>
+                  {isRegenerating ? 'Rebuilding…' : 'Re-run auto'}
+                </Button>
+              </div>
+              <div
+                className="muted"
+                style={{ fontSize: '12px', marginTop: '8px', display: 'flex', gap: '8px' }}
+              >
+                <span>
+                  {maskMeta.method === 'seed-color'
+                    ? 'Seeded mask'
+                    : maskMeta.method === 'auto' || maskMeta.method === 'color-dominant'
+                      ? 'Auto mask'
+                      : 'Brush edits'}
+                </span>
+                {maskMeta.seedColor ? (
+                  <span
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      borderRadius: '999px',
+                      background: `hsl(${maskMeta.seedColor.h}, ${maskMeta.seedColor.s}%, ${maskMeta.seedColor.l}%)`,
+                      border: '1px solid var(--border)',
+                    }}
+                  />
+                ) : null}
+              </div>
             </div>
           </Card>
 
