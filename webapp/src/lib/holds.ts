@@ -1,4 +1,4 @@
-import { detectHolds, type HoldDetectionResult } from '@crux/vision';
+import { detectHoldsContrast, type ContrastDetectionResult, type ContrastHoldCandidate, type HSL } from '@crux/vision';
 import { readImagePixels } from './image';
 
 const hslDistance = (a: { h: number; s: number; l: number }, b: { h: number; s: number; l: number }): number => {
@@ -11,19 +11,43 @@ const hslDistance = (a: { h: number; s: number; l: number }, b: { h: number; s: 
   return Math.sqrt((hue * hueWeight) ** 2 + sat * sat + (light * lightWeight) ** 2);
 };
 
+export type EnrichedContrastHoldCandidate = ContrastHoldCandidate & { clusterIndex: number; center: HSL };
+export type EnrichedDetectionResult = Omit<ContrastDetectionResult, 'holds'> & { holds: EnrichedContrastHoldCandidate[] };
+
 export async function detectHoldsFromPhoto(params: {
   uri: string;
   maxWidth?: number;
-}): Promise<ReturnType<typeof detectHolds>> {
+  wallColor?: HSL;
+}): Promise<EnrichedDetectionResult> {
   const { pixels, width, height } = await readImagePixels({
     uri: params.uri,
     maxWidth: params.maxWidth,
   });
-  return detectHolds({ pixels, width, height });
+  const detection = detectHoldsContrast({ pixels, width, height, wallColor: params.wallColor });
+
+  // Polyfill for legacy consumers (api.ts) that expect clusterIndex/center
+  const enrichedHolds: EnrichedContrastHoldCandidate[] = detection.holds.map((hold) => {
+    let bestIndex = -1;
+    let bestDist = Infinity;
+    detection.clusters.forEach((cluster, idx) => {
+      const dist = hslDistance(hold.avgColor, cluster.center);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIndex = idx;
+      }
+    });
+    return {
+      ...hold,
+      clusterIndex: bestIndex,
+      center: hold.avgColor,
+    };
+  });
+
+  return { ...detection, holds: enrichedHolds };
 }
 
 export const buildRouteMaskForCluster = (
-  detection: HoldDetectionResult,
+  detection: { labels: Int32Array; holds: { clusterIndex: number; id: number }[]; width: number; height: number },
   clusterIndex: number | null
 ): Uint8Array => {
   const { labels, holds, width, height } = detection;
@@ -41,7 +65,7 @@ export const buildRouteMaskForCluster = (
 };
 
 export const buildRouteMaskForHoldColor = (
-  detection: HoldDetectionResult,
+  detection: { labels: Int32Array; holds: { id: number; avgColor: HSL; center: HSL; clusterIndex: number }[]; width: number; height: number },
   holdId: number | null,
   options?: { threshold?: number }
 ): Uint8Array => {
@@ -51,12 +75,14 @@ export const buildRouteMaskForHoldColor = (
   const targetHold = holds[holdId];
   if (!targetHold) return routeMask;
   const target = targetHold.avgColor ?? targetHold.center;
+  const targetCluster = targetHold.clusterIndex;
   const threshold =
     options?.threshold ??
     (target.s < 18 ? 0.11 : 0.15);
 
   const matching = new Set<number>();
   for (const hold of holds) {
+    if (hold.clusterIndex !== targetCluster) continue;
     const color = hold.avgColor ?? hold.center;
     if (hslDistance(color, target) <= threshold) {
       matching.add(hold.id);
@@ -73,7 +99,7 @@ export const buildRouteMaskForHoldColor = (
   return routeMask;
 };
 
-export const pickBestCluster = (detection: HoldDetectionResult): number | null => {
+export const pickBestCluster = (detection: { holds: { clusterIndex: number; score: number }[] }): number | null => {
   const clusterScores = new Map<number, number>();
   for (const hold of detection.holds) {
     clusterScores.set(

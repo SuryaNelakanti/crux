@@ -341,3 +341,26 @@ Adopt the "Atlas" design language:
 - Clear separation between structure (Grid) and human input (Doodles)
 - Requires maintenance of dual-layer visual system (Tech + Organic)
 - Typography choices (Serif + Mono) require careful font loading
+
+---
+
+## ADR-015: Contrast-Based Hold Detection containing Vector Doodles
+
+**Date:** 2026-01-19
+
+**Status:** Accepted
+
+**Context:**
+The previous K-means clustering approach for hold detection often failed on multi-colored walls or when lighting varied significantly. Users found it difficult to get accurate masks without manual brushing. Additionally, the visualization of detected holds was unclear.
+
+**Decision:**
+1.  **Contrast-Based Detection:** Switch to a "wall subtraction" algorithm. Detect the dominant wall color (or use a user-sampled color) and identify holds as regions with significant LAB color distance from the wall.
+2.  **Vector Doodle Visualization:** Render *all* detected holds as "white vector doodles" (white fill, black stroke) to provide a clear, aesthetic overlay that looks like a sketched guide.
+3.  **Wall Picker Tool:** Add a specific tool for users to sample the wall color, which feeds into the detection algorithm to handle complex wall textures.
+4.  **Legacy Polyfill:** Enrich the new detection results with computed cluster indices to maintain compatibility with existing stats and auto-masking APIs that expect K-means clusters.
+
+**Consequences:**
+- Signifcant improvement in detection accuracy on complex walls
+- "White Doodle" aesthetic aligns with the Atlas/Journal design language
+- Users have more control via the Wall Picker
+- Backend API remains stable despite the detection engine swap

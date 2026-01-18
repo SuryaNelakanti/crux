@@ -1,5 +1,5 @@
-import { type HSL } from '@crux/vision';
-import { useEffect, useRef, useState } from 'react';
+import { type HSL, rgbToHsl } from '@crux/vision';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DoodleScribble } from '@/components/Doodle';
 import { Button, Segmented } from '@/components/ui';
@@ -17,6 +17,8 @@ import {
 } from '@/lib/holds';
 
 type BrushSize = 'S' | 'M' | 'L';
+type HoldDetection = Awaited<ReturnType<typeof detectHoldsFromPhoto>>;
+type Point = { x: number; y: number };
 
 export function MaskEditorRoute() {
   const { problemId } = useParams();
@@ -30,14 +32,14 @@ export function MaskEditorRoute() {
   const [maskSize, setMaskSize] = useState<{ width: number; height: number } | null>(null);
   const [mode, setMode] = useState<'add' | 'erase'>('add');
   const [brushSize, setBrushSize] = useState<BrushSize>('M');
-  const [tool, setTool] = useState<'select' | 'edit'>('select');
+  const [tool, setTool] = useState<'select' | 'edit' | 'pick-wall'>('select');
+  const [wallColor, setWallColor] = useState<HSL | null>(null);
   const [saving, setSaving] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isHoldingAlt, setIsHoldingAlt] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [holdDetection, setHoldDetection] =
-    useState<Awaited<ReturnType<typeof detectHoldsFromPhoto>> | null>(null);
+  const [holdDetection, setHoldDetection] = useState<HoldDetection | null>(null);
   const [maskMeta, setMaskMeta] = useState<{
     method: 'auto' | 'seed-color' | 'manual-edit' | 'color-dominant';
     seedColor?: HSL;
@@ -78,23 +80,138 @@ export function MaskEditorRoute() {
     };
   };
 
-  const drawRoundedRect = (
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
+  const isBoundaryPixel = (
+    labels: Int32Array,
     width: number,
     height: number,
-    radius: number
+    x: number,
+    y: number,
+    holdId: number
   ) => {
-    const r = Math.max(0, Math.min(radius, width / 2, height / 2));
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + width, y, x + width, y + height, r);
-    ctx.arcTo(x + width, y + height, x, y + height, r);
-    ctx.arcTo(x, y + height, x, y, r);
-    ctx.arcTo(x, y, x + width, y, r);
-    ctx.closePath();
+    const idx = y * width + x;
+    if (labels[idx] !== holdId) return false;
+    if (x === 0 || y === 0 || x === width - 1 || y === height - 1) return true;
+    const left = labels[idx - 1];
+    const right = labels[idx + 1];
+    const up = labels[idx - width];
+    const down = labels[idx + width];
+    return left !== holdId || right !== holdId || up !== holdId || down !== holdId;
   };
+
+  const simplifyPath = (points: Point[], minDistance = 1.1) => {
+    if (points.length <= 3) return points;
+    const simplified: Point[] = [points[0]];
+    let last = points[0];
+    for (let i = 1; i < points.length; i += 1) {
+      const point = points[i];
+      const dx = point.x - last.x;
+      const dy = point.y - last.y;
+      if (dx * dx + dy * dy >= minDistance * minDistance) {
+        simplified.push(point);
+        last = point;
+      }
+    }
+    return simplified;
+  };
+
+  const smoothClosedPath = (points: Point[], iterations = 1) => {
+    let path = points;
+    for (let i = 0; i < iterations; i += 1) {
+      if (path.length < 3) return path;
+      const next: Point[] = [];
+      for (let j = 0; j < path.length; j += 1) {
+        const p0 = path[j];
+        const p1 = path[(j + 1) % path.length];
+        next.push({
+          x: 0.75 * p0.x + 0.25 * p1.x,
+          y: 0.75 * p0.y + 0.25 * p1.y,
+        });
+        next.push({
+          x: 0.25 * p0.x + 0.75 * p1.x,
+          y: 0.25 * p0.y + 0.75 * p1.y,
+        });
+      }
+      path = next;
+    }
+    return path;
+  };
+
+  const traceHoldOutline = (
+    detection: HoldDetection,
+    holdId: number,
+    bbox: { minX: number; minY: number; maxX: number; maxY: number }
+  ): Point[] => {
+    const { labels, width, height } = detection;
+    let start: Point | null = null;
+    for (let y = bbox.minY; y <= bbox.maxY; y += 1) {
+      for (let x = bbox.minX; x <= bbox.maxX; x += 1) {
+        if (isBoundaryPixel(labels, width, height, x, y, holdId)) {
+          start = { x, y };
+          break;
+        }
+      }
+      if (start) break;
+    }
+    if (!start) return [];
+
+    const directions = [
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+      { x: -1, y: 1 },
+      { x: -1, y: 0 },
+      { x: -1, y: -1 },
+      { x: 0, y: -1 },
+      { x: 1, y: -1 },
+    ];
+
+    const path: Point[] = [];
+    const visited = new Set<string>();
+    let current = start;
+    let prevDir = 6;
+    const maxSteps = Math.max(100, (bbox.maxX - bbox.minX + bbox.maxY - bbox.minY) * 12);
+
+    for (let step = 0; step < maxSteps; step += 1) {
+      const key = `${current.x},${current.y}`;
+      if (visited.has(key) && step > 10) break;
+      visited.add(key);
+      path.push({ x: current.x + 0.5, y: current.y + 0.5 });
+
+      let found = false;
+      for (let i = 0; i < directions.length; i += 1) {
+        const dirIndex = (prevDir + 1 + i) % directions.length;
+        const dir = directions[dirIndex];
+        const nx = current.x + dir.x;
+        const ny = current.y + dir.y;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        if (!isBoundaryPixel(labels, width, height, nx, ny, holdId)) continue;
+        current = { x: nx, y: ny };
+        prevDir = (dirIndex + 4) % directions.length;
+        found = true;
+        break;
+      }
+      if (!found) break;
+      if (current.x === start.x && current.y === start.y && step > 10) break;
+    }
+
+    return smoothClosedPath(simplifyPath(path), 1);
+  };
+
+  const buildHoldOutlines = (detection: HoldDetection) => {
+    const outlines = new Map<number, Point[]>();
+    for (const hold of detection.holds) {
+      const outline = traceHoldOutline(detection, hold.id, hold.bbox);
+      if (outline.length > 2) {
+        outlines.set(hold.id, outline);
+      }
+    }
+    return outlines;
+  };
+
+  const holdOutlines = useMemo(() => {
+    if (!holdDetection) return new Map<number, Point[]>();
+    return buildHoldOutlines(holdDetection);
+  }, [holdDetection]);
 
   const drawHoldOutlines = (
     ctx: CanvasRenderingContext2D,
@@ -103,7 +220,7 @@ export function MaskEditorRoute() {
   ) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0 || rect.height === 0) return;
-    const { scale, drawWidth, drawHeight, offsetX, offsetY } = getContainTransform(rect.width, rect.height);
+    const { scale, offsetX, offsetY } = getContainTransform(rect.width, rect.height);
     const selected = new Set<number>();
     if (routeMask) {
       for (let i = 0; i < routeMask.length; i += 1) {
@@ -112,31 +229,67 @@ export function MaskEditorRoute() {
         if (holdId >= 0) selected.add(holdId);
       }
     }
-    const hasSelection = selected.size > 0;
-    const showAll = tool === 'edit' || !hasSelection;
 
     ctx.save();
     ctx.translate(-offsetX, -offsetY);
     ctx.scale(scale, scale);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(1.4, 2.4 / scale);
 
+    // Draw ALL holds with white fill + black stroke ("vector doodle" style)
     for (const hold of detection.holds) {
       const isSelected = selected.has(hold.id);
-      if (!showAll && !isSelected) continue;
-      const { minX, minY, maxX, maxY } = hold.bbox;
-      const width = maxX - minX + 1;
-      const height = maxY - minY + 1;
-      const padding = Math.max(2, Math.min(width, height) * 0.08);
-      const x = minX - padding;
-      const y = minY - padding;
-      const w = width + padding * 2;
-      const h = height + padding * 2;
-      const radius = Math.min(10, Math.min(w, h) * 0.25);
-      ctx.strokeStyle = isSelected ? 'rgba(255, 255, 255, 0.98)' : 'rgba(47, 191, 156, 0.45)';
-      drawRoundedRect(ctx, x, y, w, h, radius);
-      ctx.stroke();
+      const outline = holdOutlines.get(hold.id);
+
+      // Style: white fill, black stroke for all. Selected gets thicker stroke.
+      ctx.fillStyle = isSelected ? 'rgba(255, 255, 255, 0.92)' : 'rgba(255, 255, 255, 0.7)';
+      ctx.strokeStyle = isSelected ? '#1a1a1a' : 'rgba(30, 30, 30, 0.6)';
+      ctx.lineWidth = isSelected ? Math.max(2.5, 3.5 / scale) : Math.max(1.2, 2 / scale);
+
+      if (outline && outline.length > 2) {
+        ctx.beginPath();
+        ctx.moveTo(outline[0].x, outline[0].y);
+        for (let i = 1; i < outline.length; i += 1) {
+          ctx.lineTo(outline[i].x, outline[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        // Fallback to rounded rect bounding box
+        const { minX, minY, maxX, maxY } = hold.bbox;
+        const bboxW = maxX - minX + 1;
+        const bboxH = maxY - minY + 1;
+        const padding = Math.max(2, Math.min(bboxW, bboxH) * 0.08);
+        const x = minX - padding;
+        const y = minY - padding;
+        const w = bboxW + padding * 2;
+        const h = bboxH + padding * 2;
+        const r = Math.min(10, Math.min(w, h) * 0.25);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // Overlay a route color for selected holds
+      if (isSelected) {
+        ctx.fillStyle = 'rgba(47, 191, 156, 0.35)';
+        if (outline && outline.length > 2) {
+          ctx.beginPath();
+          ctx.moveTo(outline[0].x, outline[0].y);
+          for (let i = 1; i < outline.length; i += 1) {
+            ctx.lineTo(outline[i].x, outline[i].y);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
     }
     ctx.restore();
   };
@@ -267,82 +420,26 @@ export function MaskEditorRoute() {
   const isEditing = tool === 'edit';
   const hintText = isRegenerating
     ? 'Detecting holds...'
-    : isEditing
-      ? 'Brush to refine. Hold Alt to erase.'
-      : 'Tap a hold to select the route. Tap empty wall to clear.';
+    : tool === 'pick-wall'
+      ? 'Click on the wall to sample its color.'
+      : isEditing
+        ? 'Brush to refine. Hold Alt to erase.'
+        : 'Tap a hold to select the route. Tap empty wall to clear.';
 
   const buildHoldOverlay = (
     detection: NonNullable<typeof holdDetection>,
-    routeMask: Uint8Array | null,
-    options?: { showAllHolds?: boolean }
+    routeMask: Uint8Array | null
   ) => {
-    const { labels, width, height } = detection;
+    const { width, height } = detection;
     const overlay = new Uint8Array(width * height * 4);
-    const holdTint = { r: 47, g: 191, b: 156 };
-    const routeTint = { r: 255, g: 255, b: 255 };
-    const holdAlpha = 80;
-    const routeAlpha = 255;
-    const routeHaloAlpha = 200;
-    let routeHasPixels = false;
-    if (routeMask) {
-      for (let i = 0; i < routeMask.length; i += 1) {
-        if (routeMask[i] === 1) {
-          routeHasPixels = true;
-          break;
-        }
-      }
-    }
-    const showAllHolds = options?.showAllHolds ?? !routeHasPixels;
-
-    const setPixel = (
-      idx: number,
-      alpha: number,
-      tint: { r: number; g: number; b: number }
-    ) => {
-      const offset = idx * 4;
-      overlay[offset] = tint.r;
-      overlay[offset + 1] = tint.g;
-      overlay[offset + 2] = tint.b;
-      overlay[offset + 3] = Math.max(overlay[offset + 3], alpha);
-    };
-
-    // Hold outlines (all holds)
-    if (showAllHolds) {
-      for (let y = 0; y < height; y += 1) {
-        for (let x = 0; x < width; x += 1) {
-          const idx = y * width + x;
-          const holdId = labels[idx];
-          if (holdId < 0) continue;
-          const left = x > 0 ? labels[idx - 1] : -1;
-          const right = x < width - 1 ? labels[idx + 1] : -1;
-          const up = y > 0 ? labels[idx - width] : -1;
-          const down = y < height - 1 ? labels[idx + width] : -1;
-          const isEdge = left !== holdId || right !== holdId || up !== holdId || down !== holdId;
-          if (!isEdge) continue;
-          setPixel(idx, holdAlpha, holdTint);
-        }
-      }
-    }
-
-    // Route outlines (mask edges, for manual edits and selection)
-    if (routeMask) {
-      for (let y = 0; y < height; y += 1) {
-        for (let x = 0; x < width; x += 1) {
-          const idx = y * width + x;
-          if (routeMask[idx] !== 1) continue;
-          const left = x > 0 ? routeMask[idx - 1] : 0;
-          const right = x < width - 1 ? routeMask[idx + 1] : 0;
-          const up = y > 0 ? routeMask[idx - width] : 0;
-          const down = y < height - 1 ? routeMask[idx + width] : 0;
-          const isEdge = left === 0 || right === 0 || up === 0 || down === 0;
-          if (!isEdge) continue;
-          setPixel(idx, routeAlpha, routeTint);
-          if (x > 0) setPixel(idx - 1, routeHaloAlpha, routeTint);
-          if (x < width - 1) setPixel(idx + 1, routeHaloAlpha, routeTint);
-          if (y > 0) setPixel(idx - width, routeHaloAlpha, routeTint);
-          if (y < height - 1) setPixel(idx + width, routeHaloAlpha, routeTint);
-        }
-      }
+    if (!routeMask) return overlay;
+    for (let i = 0; i < routeMask.length; i += 1) {
+      if (routeMask[i] !== 1) continue;
+      const offset = i * 4;
+      overlay[offset] = maskTint.r;
+      overlay[offset + 1] = maskTint.g;
+      overlay[offset + 2] = maskTint.b;
+      overlay[offset + 3] = maskTint.a;
     }
 
     return overlay;
@@ -383,7 +480,11 @@ export function MaskEditorRoute() {
     if (!detection && photoUrl) {
       setIsRegenerating(true);
       try {
-        detection = await detectHoldsFromPhoto({ uri: photoUrl, maxWidth: maskSize.width });
+        detection = await detectHoldsFromPhoto({
+          uri: photoUrl,
+          maxWidth: maskSize.width,
+          wallColor: wallColor ?? undefined,
+        });
         setHoldDetection(detection);
       } finally {
         setIsRegenerating(false);
@@ -428,7 +529,54 @@ export function MaskEditorRoute() {
     }
   };
 
+  const handlePickWall = async (clientX: number, clientY: number) => {
+    if (!photoUrl || !maskSize) return;
+    const point = mapPointerToMask(clientX, clientY);
+    if (!point) return;
+
+    // Sample pixel color from the photo
+    // Create a temporary canvas to get pixel data
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = photoUrl;
+    await new Promise<void>((resolve) => {
+      img.onload = () => resolve();
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = maskSize.width;
+    canvas.height = maskSize.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(img, 0, 0, maskSize.width, maskSize.height);
+    const imageData = ctx.getImageData(point.x, point.y, 1, 1);
+    const [r, g, b] = imageData.data;
+
+    // Convert RGB to HSL
+    const hsl = rgbToHsl({ r, g, b });
+    setWallColor(hsl);
+
+    // Re-detect holds with the new wall color
+    setIsRegenerating(true);
+    setTool('select');
+    try {
+      const detection = await detectHoldsFromPhoto({
+        uri: photoUrl,
+        maxWidth: maskSize.width,
+        wallColor: hsl, // Pass the newly sampled color directly
+      });
+      setHoldDetection(detection);
+      // Clear mask since we have a new detection
+      setMaskData(new Uint8Array(maskSize.width * maskSize.height));
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (tool === 'pick-wall') {
+      void handlePickWall(e.clientX, e.clientY);
+      return;
+    }
     if (tool === 'select') {
       void handleSelectHold(e.clientX, e.clientY);
       return;
@@ -451,7 +599,11 @@ export function MaskEditorRoute() {
     if (!photoUrl || !maskSize) return;
     setIsRegenerating(true);
     try {
-      const detection = await detectHoldsFromPhoto({ uri: photoUrl, maxWidth: maskSize.width });
+      const detection = await detectHoldsFromPhoto({
+        uri: photoUrl,
+        maxWidth: maskSize.width,
+        wallColor: wallColor ?? undefined,
+      });
       setHoldDetection(detection);
       applyRouteMask(detection, pickBestCluster(detection));
     } finally {
@@ -499,6 +651,7 @@ export function MaskEditorRoute() {
             options={[
               { value: 'select', label: 'Select' },
               { value: 'edit', label: 'Edit' },
+              { value: 'pick-wall', label: 'Pick Wall' },
             ]}
             value={tool}
             onChange={setTool}

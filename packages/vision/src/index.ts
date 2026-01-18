@@ -38,3 +38,10 @@ export {
 
 // Hold detection
 export { detectHolds, type HoldCandidate, type HoldDetectionResult } from './holds';
+export {
+  detectHoldsContrast,
+  type ContrastDetectionParams,
+  type ContrastDetectionResult,
+  type ContrastHoldCandidate,
+} from './holds/contrast';
+
