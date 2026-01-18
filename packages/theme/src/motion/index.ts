@@ -1,5 +1,5 @@
-export { durations, getDurationSeconds, type Duration } from './durations';
-export { easing, type EasingName } from './easing';
-export { springs, type SpringName, type SpringConfig } from './springs';
-export { patterns, type PatternName, type Pattern } from './patterns';
-export { haptics, triggerHaptic, type HapticType } from './haptics';
+export { type Duration, durations, getDurationSeconds } from './durations';
+export { type EasingName, easing } from './easing';
+export { type HapticType, haptics, triggerHaptic } from './haptics';
+export { type Pattern, type PatternName, patterns } from './patterns';
+export { type SpringConfig, type SpringName, springs } from './springs';

@@ -1,9 +1,9 @@
+import { OUTCOME_OPTIONS, type Outcome } from '@crux/shared';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { DoodleArrow, DoodleWave, Sparkle } from '@/components/Doodle';
 import { Badge, Button, Card, Input, Segmented, Textarea } from '@/components/ui';
-import { DoodleWave, Sparkle } from '@/components/Doodle';
 import { fetchProblemDetail, getMaskConfidenceLabel, saveProblemLog } from '@/lib/api';
-import { OUTCOME_OPTIONS, type Outcome } from '@crux/shared';
 
 const MASK_VIEW_OPTIONS = [
   { value: 'photo', label: 'Photo' },
@@ -63,94 +63,137 @@ export function ProblemDetailRoute() {
 
   return (
     <div className="app-shell">
-      <div className="header">
+      <header className="nav">
         <div className="brand">
-          <Sparkle />
+          <div className="brand-mark">
+            <Sparkle />
+          </div>
           <div>
-            <h1>Problem</h1>
-            <p className="muted">{detail.sessionId ?? 'Session'}</p>
+            <div className="brand-title">Problem</div>
+            <p className="brand-subtitle">{detail.sessionId ?? 'Session'}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="nav-actions">
           <Button variant="ghost" onClick={() => navigate(-1)}>
             Back
           </Button>
           <DoodleWave />
         </div>
-      </div>
+      </header>
 
-      <Card className="reveal">
-        <div className="photo-frame" style={{ height: 320 }}>
-          {detail.imageUrl ? <img src={detail.imageUrl} alt="Problem" /> : null}
-          {maskView === 'mask' && detail.maskUrl ? (
-            <img className="mask-overlay" src={detail.maskUrl} alt="Mask overlay" />
-          ) : null}
-        </div>
-        <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          <Badge label={`Mask: ${getMaskConfidenceLabel(detail.maskConfidence)}`} variant="brand" />
-          {detail.maskMethod ? <Badge label={`Method: ${detail.maskMethod}`} variant="neutral" /> : null}
-          {detail.maskUrl ? <Badge label="Mask ready" variant="brand" /> : <Badge label="Mask pending" variant="warning" />}
-        </div>
-        <div style={{ marginTop: '16px' }}>
-          <Segmented options={[...MASK_VIEW_OPTIONS]} value={maskView} onChange={setMaskView} />
-        </div>
-        <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <Button variant="secondary" onClick={() => navigate(`/problem/${problemId}/mask`)}>
-            Edit mask
-          </Button>
-        </div>
-      </Card>
-
-      <Card className="reveal">
-        <h2 className="section-title">Log outcome</h2>
-        <Segmented
-          options={OUTCOME_OPTIONS.map((option) => ({ label: option.label, value: option.value }))}
-          value={outcome}
-          onChange={setOutcome}
-        />
-        <div className="grid two" style={{ marginTop: '16px' }}>
-          <div>
-            <label className="muted">Attempts</label>
-            <Input
-              type="number"
-              placeholder="e.g. 3"
-              value={attempts}
-              onChange={(event) => setAttempts(event.target.value)}
-            />
+      <section className="detail-grid">
+        <Card className="reveal">
+          <div className="photo-frame" style={{ height: 360 }}>
+            {detail.imageUrl ? <img src={detail.imageUrl} alt="Problem" /> : null}
+            {maskView === 'mask' && detail.maskUrl ? (
+              <img className="mask-overlay" src={detail.maskUrl} alt="Mask overlay" />
+            ) : null}
           </div>
-          <div>
-            <label className="muted">Grade range</label>
-            <div className="grid" style={{ gap: '8px' }}>
+          <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            <Badge
+              label={`Mask: ${getMaskConfidenceLabel(detail.maskConfidence)}`}
+              variant="brand"
+            />
+            {detail.maskMethod ? (
+              <Badge label={`Method: ${detail.maskMethod}`} variant="neutral" />
+            ) : null}
+            {detail.maskUrl ? (
+              <Badge label="Mask ready" variant="brand" />
+            ) : (
+              <Badge label="Mask pending" variant="warning" />
+            )}
+          </div>
+          <div style={{ marginTop: '16px' }}>
+            <Segmented options={[...MASK_VIEW_OPTIONS]} value={maskView} onChange={setMaskView} />
+          </div>
+          <div className="footer-actions" style={{ marginTop: '16px' }}>
+            <Button variant="secondary" onClick={() => navigate(`/problem/${problemId}/mask`)}>
+              Edit mask
+            </Button>
+            <Button variant="ghost" onClick={() => navigate(-1)}>
+              Back to session
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="reveal">
+          <div className="section-kicker">Outcome</div>
+          <h2 className="section-title">Log the climb</h2>
+          <p className="muted">Keep it light. Tap an outcome, add attempts if you want, move on.</p>
+          <Segmented
+            options={OUTCOME_OPTIONS.map((option) => ({
+              label: option.label,
+              value: option.value,
+            }))}
+            value={outcome}
+            onChange={setOutcome}
+          />
+          <div className="grid two" style={{ marginTop: '16px' }}>
+            <div>
+              <label className="muted" htmlFor="attempts-input">
+                Attempts
+              </label>
               <Input
+                id="attempts-input"
                 type="number"
-                placeholder="Min"
-                value={gradeMin}
-                onChange={(event) => setGradeMin(event.target.value)}
-              />
-              <Input
-                type="number"
-                placeholder="Max"
-                value={gradeMax}
-                onChange={(event) => setGradeMax(event.target.value)}
+                placeholder="e.g. 3"
+                value={attempts}
+                onChange={(event) => setAttempts(event.target.value)}
               />
             </div>
+            <div>
+              <div className="muted">Grade range</div>
+              <div className="grid" style={{ gap: '8px' }}>
+                <div>
+                  <label className="muted" htmlFor="grade-min-input">
+                    Min
+                  </label>
+                  <Input
+                    id="grade-min-input"
+                    type="number"
+                    placeholder="Min"
+                    value={gradeMin}
+                    onChange={(event) => setGradeMin(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="muted" htmlFor="grade-max-input">
+                    Max
+                  </label>
+                  <Input
+                    id="grade-max-input"
+                    type="number"
+                    placeholder="Max"
+                    value={gradeMax}
+                    onChange={(event) => setGradeMax(event.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div style={{ marginTop: '16px' }}>
-          <label className="muted">Note</label>
-          <Textarea
-            placeholder="Optional note"
-            rows={4}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-          />
-        </div>
-        <div className="footer-actions" style={{ marginTop: '16px' }}>
-          <Button variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save log'}
-          </Button>
-        </div>
-      </Card>
+          <div style={{ marginTop: '16px' }}>
+            <label className="muted" htmlFor="note-input">
+              Note
+            </label>
+            <Textarea
+              id="note-input"
+              placeholder="Optional note"
+              rows={4}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+            />
+          </div>
+          <div className="footer-actions" style={{ marginTop: '16px' }}>
+            <Button variant="primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Save log'}
+            </Button>
+            <Badge label="One tap flow" variant="brand" />
+          </div>
+          <div style={{ marginTop: '16px' }}>
+            <DoodleArrow />
+          </div>
+        </Card>
+      </section>
     </div>
   );
 }

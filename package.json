@@ -8,23 +8,21 @@
     "ios": "pnpm -C mobapp ios",
     "android": "pnpm -C mobapp android",
     "web": "pnpm -C webapp dev",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "biome check .",
+    "format": "biome check . --write",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "supabase:start": "cd backend && supabase start",
-    "supabase:stop": "cd backend && supabase stop",
-    "supabase:reset": "cd backend && supabase db reset",
-    "supabase:types": "cd backend && supabase gen types typescript --local > ../packages/shared/src/database.types.ts"
+    "supabase:start": "cd backend && npx supabase start",
+    "supabase:stop": "cd backend && npx supabase stop",
+    "supabase:reset": "cd backend && npx supabase db reset",
+    "supabase:types": "cd backend && npx supabase gen types typescript --local > ../packages/shared/src/database.types.ts"
   },
   "devDependencies": {
-    "typescript": "~5.3.3",
-    "eslint": "^8.57.0",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "prettier": "^3.2.0",
+    "@biomejs/biome": "^2.3.11",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.11.0",
     "jest": "^29.7.0",
-    "ts-jest": "^29.1.2"
+    "ts-jest": "^29.1.2",
+    "typescript": "~5.3.3"
   }
 }

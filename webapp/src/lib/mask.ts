@@ -3,10 +3,7 @@ import { readImagePixels } from './image';
 
 const MASK_TINT = { r: 27, g: 175, b: 161, a: 180 };
 
-export async function generateMaskFromPhoto(params: {
-  uri: string;
-  seedColor?: HSL;
-}): Promise<{
+export async function generateMaskFromPhoto(params: { uri: string; seedColor?: HSL }): Promise<{
   mask: Uint8Array;
   width: number;
   height: number;

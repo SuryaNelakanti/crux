@@ -1,6 +1,6 @@
 /**
  * Session feature module
- * 
+ *
  * Handles session lifecycle:
  * - Start session
  * - Add problems to session
@@ -9,9 +9,9 @@
  */
 
 export {
-    createSession,
-    endSession,
-    getSessionById,
-    getSessionSummaries,
-    type SessionSummary,
+  createSession,
+  endSession,
+  getSessionById,
+  getSessionSummaries,
+  type SessionSummary,
 } from '@/lib/db';

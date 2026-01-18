@@ -1,9 +1,9 @@
 /**
  * @crux/supabase-client
- * 
+ *
  * Typed Supabase API boundary for Crux app.
  * All database and storage operations go through this package.
- * 
+ *
  * Rules:
  * - No UI logic
  * - All operations return typed results
@@ -12,34 +12,32 @@
 
 // Client
 export {
-    createClient,
-    getClient,
-    resetClient,
-    type SupabaseClient,
-    type Database,
+  createClient,
+  type Database,
+  getClient,
+  resetClient,
+  type SupabaseClient,
 } from './client';
-
-// Storage
-export {
-    uploadPhoto,
-    uploadMask,
-    getPhotoSignedUrl,
-    getMaskSignedUrl,
-    deletePhoto,
-    deleteMask,
-    type UploadResult,
-} from './storage';
-
 // Database
 export {
-    upsertUsers,
-    upsertSessions,
-    upsertProblems,
-    upsertProblemMembers,
-    upsertMedia,
-    upsertRouteMasks,
-    upsertUserProblemLogs,
-    insertEvents,
-    resolveProblemShareToken,
-    joinProblemWithToken,
+  insertEvents,
+  joinProblemWithToken,
+  resolveProblemShareToken,
+  upsertMedia,
+  upsertProblemMembers,
+  upsertProblems,
+  upsertRouteMasks,
+  upsertSessions,
+  upsertUserProblemLogs,
+  upsertUsers,
 } from './db';
+// Storage
+export {
+  deleteMask,
+  deletePhoto,
+  getMaskSignedUrl,
+  getPhotoSignedUrl,
+  type UploadResult,
+  uploadMask,
+  uploadPhoto,
+} from './storage';

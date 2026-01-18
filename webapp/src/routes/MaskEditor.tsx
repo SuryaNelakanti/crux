@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Card, Segmented } from '@/components/ui';
-import { DoodleWave, Sparkle } from '@/components/Doodle';
+import { DoodleArrow, DoodleWave, Sparkle } from '@/components/Doodle';
+import { Badge, Button, Card, Segmented } from '@/components/ui';
 import { fetchProblemDetail, saveMaskVersion } from '@/lib/api';
-import {
-  applyBrushToMask,
-  loadMaskPixelsFromUrl,
-  maskTint,
-} from '@/lib/mask';
+import { applyBrushToMask, loadMaskPixelsFromUrl, maskTint } from '@/lib/mask';
 
 const MODE_OPTIONS = [
   { value: 'add', label: 'Add' },
@@ -58,9 +54,10 @@ export function MaskEditorRoute() {
             img.onerror = () => reject(new Error('Unable to load image'));
             img.src = detail.imageUrl ?? '';
           });
-        const { width, height } = detail.media.width && detail.media.height
-          ? { width: detail.media.width, height: detail.media.height }
-          : await loadImageSize();
+        const { width, height } =
+          detail.media.width && detail.media.height
+            ? { width: detail.media.width, height: detail.media.height }
+            : await loadImageSize();
         setMaskData(new Uint8Array(width * height));
         setRgbaData(new Uint8Array(width * height * 4));
         setMaskSize({ width, height });
@@ -75,7 +72,11 @@ export function MaskEditorRoute() {
     if (!ctx) return;
     canvasRef.current.width = maskSize.width;
     canvasRef.current.height = maskSize.height;
-    const imageData = new ImageData(new Uint8ClampedArray(rgbaData), maskSize.width, maskSize.height);
+    const imageData = new ImageData(
+      new Uint8ClampedArray(rgbaData),
+      maskSize.width,
+      maskSize.height
+    );
     ctx.putImageData(imageData, 0, 0);
   }, [rgbaData, maskSize]);
 
@@ -105,7 +106,11 @@ export function MaskEditorRoute() {
     });
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
-    const imageData = new ImageData(new Uint8ClampedArray(rgbaData), maskSize.width, maskSize.height);
+    const imageData = new ImageData(
+      new Uint8ClampedArray(rgbaData),
+      maskSize.width,
+      maskSize.height
+    );
     ctx.putImageData(imageData, 0, 0);
   };
 
@@ -142,61 +147,82 @@ export function MaskEditorRoute() {
 
   return (
     <div className="app-shell">
-      <div className="header">
+      <header className="nav">
         <div className="brand">
-          <Sparkle />
+          <div className="brand-mark">
+            <Sparkle />
+          </div>
           <div>
-            <h1>Mask editor</h1>
-            <p className="muted">Brush add or erase holds</p>
+            <div className="brand-title">Mask editor</div>
+            <p className="brand-subtitle">Brush add or erase holds</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="nav-actions">
           <Button variant="ghost" onClick={() => navigate(-1)}>
             Back
           </Button>
           <DoodleWave />
         </div>
-      </div>
+      </header>
 
-      <Card className="reveal">
-        {!photoUrl || !maskSize ? (
-          <p className="muted">Loading mask editor...</p>
-        ) : (
-          <>
-            <div className="photo-frame" style={{ height: 360 }}>
-              <img src={photoUrl} alt="Problem" />
-              <canvas
-                ref={canvasRef}
-                className="mask-overlay"
-                style={{ width: '100%', height: '100%', touchAction: 'none' }}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerLeave={handlePointerUp}
-              />
-            </div>
-            <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <div className="muted" style={{ fontSize: '12px', marginBottom: '6px' }}>
-                  Mode
-                </div>
-                <Segmented options={[...MODE_OPTIONS]} value={mode} onChange={setMode} />
+      <section className="editor-grid">
+        <Card className="reveal">
+          {!photoUrl || !maskSize ? (
+            <p className="muted">Loading mask editor...</p>
+          ) : (
+            <>
+              <div className="photo-frame" style={{ height: 360 }}>
+                <img src={photoUrl} alt="Problem" />
+                <canvas
+                  ref={canvasRef}
+                  className="mask-overlay"
+                  style={{ width: '100%', height: '100%', touchAction: 'none' }}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerLeave={handlePointerUp}
+                />
               </div>
-              <div>
-                <div className="muted" style={{ fontSize: '12px', marginBottom: '6px' }}>
-                  Brush size
-                </div>
-                <Segmented options={[...SIZE_OPTIONS]} value={brushSize} onChange={setBrushSize} />
+              <div className="footer-actions" style={{ marginTop: '16px' }}>
+                <Button variant="primary" onClick={handleSave} disabled={saving}>
+                  {saving ? 'Saving...' : 'Save mask'}
+                </Button>
+                <Badge label="Versioned edits" variant="brand" />
               </div>
+            </>
+          )}
+        </Card>
+
+        <div className="toolbelt">
+          <Card className="card-soft reveal">
+            <div className="section-kicker">Tools</div>
+            <h2 className="section-title">Brush controls</h2>
+            <div style={{ marginTop: '12px' }}>
+              <div className="muted" style={{ fontSize: '12px', marginBottom: '6px' }}>
+                Mode
+              </div>
+              <Segmented options={[...MODE_OPTIONS]} value={mode} onChange={setMode} />
             </div>
-            <div className="footer-actions" style={{ marginTop: '16px' }}>
-              <Button variant="primary" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving...' : 'Save mask'}
-              </Button>
+            <div style={{ marginTop: '16px' }}>
+              <div className="muted" style={{ fontSize: '12px', marginBottom: '6px' }}>
+                Brush size
+              </div>
+              <Segmented options={[...SIZE_OPTIONS]} value={brushSize} onChange={setBrushSize} />
             </div>
-          </>
-        )}
-      </Card>
+          </Card>
+
+          <Card className="card-soft reveal">
+            <div className="section-kicker">Tips</div>
+            <h2 className="section-title">Keep it clean</h2>
+            <p className="muted">
+              Use a bigger brush for blocks, then tighten edges with a small pass.
+            </p>
+            <div style={{ marginTop: '12px' }}>
+              <DoodleArrow />
+            </div>
+          </Card>
+        </div>
+      </section>
     </div>
   );
 }

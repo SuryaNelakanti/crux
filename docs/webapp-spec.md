@@ -16,6 +16,7 @@
 2. Session list
    - List recent sessions with counts and status.
    - Start session button.
+   - Quick capture: create a new session and upload a photo in one step.
 3. Session detail
    - Upload problem photo.
    - List problems with outcome + grade chips.
@@ -39,11 +40,12 @@
 
 ## Media Pipeline (Web)
 1. User uploads a photo file.
-2. Create problem + media rows in Supabase.
+2. Create problem row and membership first (RLS-safe).
 3. Upload photo to storage bucket.
-4. Generate mask in browser using `@crux/vision` (canvas pixel read).
-5. Upload mask PNG to storage bucket.
-6. Create route mask version row + media row.
+4. Create media row and update problem primary_media_id.
+5. Generate mask in browser using `@crux/vision` (canvas pixel read).
+6. Upload mask PNG to storage bucket.
+7. Create route mask version row + mask media row.
 
 ## Mask Editing (Web)
 - Canvas-based overlay.

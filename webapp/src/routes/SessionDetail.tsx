@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Badge, Button, Card } from '@/components/ui';
-import { DoodleWave, Sparkle } from '@/components/Doodle';
-import { createProblemFromUpload, fetchProblemsForSession, fetchSessions, endSession } from '@/lib/api';
+import { DoodleArrow, DoodleWave, Sparkle } from '@/components/Doodle';
 import { ProblemCard } from '@/components/ProblemCard';
+import { Badge, Button, Card } from '@/components/ui';
+import {
+  createProblemFromUpload,
+  endSession,
+  fetchProblemsForSession,
+  fetchSessions,
+} from '@/lib/api';
 
 export function SessionDetailRoute() {
   const navigate = useNavigate();
@@ -16,7 +21,7 @@ export function SessionDetailRoute() {
   const [sessionStatus, setSessionStatus] = useState<'Live' | 'Ended'>('Live');
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!sessionId) return;
     setLoading(true);
     try {
@@ -31,11 +36,11 @@ export function SessionDetailRoute() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionId]);
 
   useEffect(() => {
     void load();
-  }, [sessionId]);
+  }, [load]);
 
   const handleUpload = () => {
     fileRef.current?.click();
@@ -71,46 +76,69 @@ export function SessionDetailRoute() {
 
   return (
     <div className="app-shell">
-      <div className="header">
+      <header className="nav">
         <div className="brand">
-          <Sparkle />
+          <div className="brand-mark">
+            <Sparkle />
+          </div>
           <div>
-            <h1>{sessionTitle}</h1>
-            <p>{sessionStatus} session</p>
+            <div className="brand-title">{sessionTitle}</div>
+            <p className="brand-subtitle">{sessionStatus} session</p>
           </div>
         </div>
-        <DoodleWave />
-      </div>
+        <div className="nav-actions">
+          <Button variant="secondary" onClick={() => navigate('/')}>
+            Sessions
+          </Button>
+          <Button variant="ghost" onClick={handleEnd}>
+            End session
+          </Button>
+          <DoodleWave />
+        </div>
+      </header>
 
-      <Card className="reveal">
-        <div className="grid" style={{ gap: '16px' }}>
-          <div>
-            <h2 className="section-title">Capture a problem</h2>
-            <p className="muted">
-              Upload a wall photo. We will auto-mask the dominant hold color.
+      <section className="hero-grid">
+        <Card className="reveal">
+          <div className="section-kicker">Capture</div>
+          <h2 className="section-title">Drop a wall photo</h2>
+          <p className="muted">
+            We auto-mask the dominant hold color and prep a clean route overlay.
+          </p>
+          <button type="button" className="dropzone" onClick={handleUpload} disabled={uploading}>
+            <div style={{ fontWeight: 600 }}>
+              {uploading ? 'Uploading...' : 'Click to upload a photo'}
+            </div>
+            <p className="muted" style={{ margin: '6px 0 0' }}>
+              JPG or PNG. Best results with the wall centered.
             </p>
-          </div>
-          <div className="footer-actions">
+          </button>
+          <div className="footer-actions" style={{ marginTop: '16px' }}>
             <Button variant="primary" onClick={handleUpload} disabled={uploading}>
               {uploading ? 'Uploading...' : 'Upload photo'}
             </Button>
-            <Button variant="secondary" onClick={() => navigate('/')}>
-              Back to sessions
-            </Button>
-            <Button variant="ghost" onClick={handleEnd}>
-              End session
-            </Button>
-          </div>
-          <div className="pill-group">
             <Badge label="Auto mask" variant="brand" />
             <Badge label="Brush edits" variant="neutral" />
           </div>
           {error ? <Badge label={error} variant="warning" /> : null}
-        </div>
-      </Card>
+        </Card>
 
-      <div>
-        <h2 className="section-title">Problems</h2>
+        <Card className="card-soft reveal">
+          <div className="section-kicker">Session status</div>
+          <h2 className="section-title">Keep it flowing</h2>
+          <p className="muted">Capture each problem as you move. Logs stay light and fast.</p>
+          <div className="pill-group" style={{ marginTop: '12px' }}>
+            <Badge label={sessionStatus === 'Live' ? 'Live capture' : 'Ended'} variant="brand" />
+            <Badge label={`${problems.length} problems`} variant="neutral" />
+          </div>
+          <div style={{ marginTop: '16px' }}>
+            <DoodleArrow />
+          </div>
+        </Card>
+      </section>
+
+      <section>
+        <div className="section-kicker">Problems</div>
+        <h2 className="section-title">Captured routes</h2>
         {loading ? (
           <Card className="card-soft">
             <p className="muted">Loading problems...</p>
@@ -120,7 +148,7 @@ export function SessionDetailRoute() {
             <p className="muted">No problems captured yet.</p>
           </Card>
         ) : (
-          <div className="grid two">
+          <div className="gallery">
             {problems.map((problem) => (
               <ProblemCard
                 key={problem.problemId}
@@ -135,7 +163,7 @@ export function SessionDetailRoute() {
             ))}
           </div>
         )}
-      </div>
+      </section>
 
       <input
         ref={fileRef}

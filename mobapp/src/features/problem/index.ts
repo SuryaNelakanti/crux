@@ -1,6 +1,6 @@
 /**
  * Problem feature module
- * 
+ *
  * Handles problem capture and logging:
  * - Take photo
  * - View/edit mask
@@ -9,10 +9,10 @@
  */
 
 export {
-    createProblemFromPhoto,
-    getProblemById,
-    getProblemCardsForSession,
-    getUserProblemLog,
-    upsertUserProblemLog,
-    type ProblemCardItem,
+  createProblemFromPhoto,
+  getProblemById,
+  getProblemCardsForSession,
+  getUserProblemLog,
+  type ProblemCardItem,
+  upsertUserProblemLog,
 } from '@/lib/db';

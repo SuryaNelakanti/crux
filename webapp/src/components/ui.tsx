@@ -1,7 +1,7 @@
 import type {
-  ReactNode,
   ButtonHTMLAttributes,
   InputHTMLAttributes,
+  ReactNode,
   TextareaHTMLAttributes,
 } from 'react';
 
@@ -27,28 +27,24 @@ export function Card({ children, className }: { children: ReactNode; className?:
 export function Badge({
   label,
   variant = 'neutral',
+  className,
 }: {
   label: string;
   variant?: 'neutral' | 'warning' | 'brand';
+  className?: string;
 }) {
-  const className = variant === 'brand' ? '' : variant;
-  return <span className={`badge ${className}`}>{label}</span>;
+  const variantClass = variant === 'brand' ? '' : variant;
+  return (
+    <span className={`badge ${variantClass}${className ? ` ${className}` : ''}`}>{label}</span>
+  );
 }
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`input${props.className ? ` ${props.className}` : ''}`} />;
 }
 
-export function Textarea({
-  className,
-  ...props
-}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      {...props}
-      className={`input${className ? ` ${className}` : ''}`}
-    />
-  );
+export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={`input${className ? ` ${className}` : ''}`} />;
 }
 
 export function Segmented<T extends string>({
@@ -76,13 +72,7 @@ export function Segmented<T extends string>({
   );
 }
 
-export function StatChip({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) {
+export function StatChip({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="stat-chip">
       <strong>{value}</strong>

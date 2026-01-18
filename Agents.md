@@ -5,38 +5,44 @@ Repository-level instructions for automated coding tools working in this codebas
 ---
 
 ## Product invariant (do not violate)
+This is an indoor bouldering journal optimized for photo -> auto-route-mask -> a few taps -> saved.
 
-This is an **indoor bouldering journal** optimized for **photo → auto-route-mask → a few taps → saved**.
-
-MVP is **data capture**, not analytics UI:
+MVP is data capture, not analytics UI:
 - Capture sessions, problems, per-user outcomes, optional attempts, optional grade ranges.
-- Generate and version a **route mask** from the photo (default: **auto-dominant hold color**, no user tap).
-- Allow fast **mask correction** (brush add/remove) as a new mask version.
-- Support **shared problem cards** (multiple users log on the same problem).
-- Work **offline-first** with reliable sync.
-- Persist **append-only events** so year-end recap is purely aggregation later.
+- Generate and version a route mask from the photo (default: auto-dominant hold color, no user tap).
+- Allow fast mask correction (brush add/remove) as a new mask version.
+- Support shared problem cards (multiple users log on the same problem).
+- Work offline-first with reliable sync (mobile requirement).
+- Persist append-only events so year-end recap is purely aggregation later.
 
-For more comprehensive product context, see `/docs/PRD.md`.
+For product context, see `docs/PRD.md` and `docs/webapp-spec.md`.
 
 ---
 
 ## Stack decisions
 
+### Web app (primary for MVP testing)
+- React + Vite + TypeScript
+- Styling: CSS variables + global styles in `webapp/src/styles/global.css`
+- UI building blocks live in `webapp/src/components`
+- Data access: Supabase via `@crux/supabase-client`
+- Mask generation: `@crux/vision` (pure functions), Canvas for mask editor
+
 ### Mobile
-- React Native via **Expo** + **TypeScript**
-- Navigation: **expo-router** (file-based routing)
-- Theming: **@shopify/restyle** (theme-driven, type-safe)
-- Animation: **react-native-reanimated** (physics-based motion)
-- Drawing/overlays/mask editor: **@shopify/react-native-skia**
-- Local persistence: **SQLite** (expo-sqlite)
-- Haptics: **expo-haptics**
-- Background sync: a small in-app worker loop (no external job runner required for MVP)
+- React Native via Expo + TypeScript
+- Navigation: expo-router (file-based routing)
+- Theming: @shopify/restyle (theme-driven, type-safe)
+- Animation: react-native-reanimated (physics-based motion)
+- Drawing/overlays/mask editor: @shopify/react-native-skia
+- Local persistence: SQLite (expo-sqlite)
+- Haptics: expo-haptics
+- Background sync: in-app worker loop (no external job runner required for MVP)
 
 ### Backend
-- **Supabase**: Auth + Postgres + Storage + RLS
-- Prefer DB constraints + RLS over app-layer "trust".
+- Supabase: Auth + Postgres + Storage + RLS
+- Prefer DB constraints + RLS over app-layer trust
 
-If the repo doesn't yet match these choices, align it to this baseline rather than mixing frameworks.
+If the repo does not match these choices, align it to this baseline rather than mixing frameworks.
 
 ---
 
@@ -44,35 +50,34 @@ If the repo doesn't yet match these choices, align it to this baseline rather th
 
 ```
 crux-journal/
-├── backend/
-│   └── supabase/               # Migrations + edge functions
-├── mobapp/                     # Expo React Native app
-│   ├── app/                    # expo-router routes
-│   ├── src/
-│   │   ├── features/           # Feature modules (session, problem, share, mask)
-│   │   ├── components/         # App-specific components (if any)
-│   │   ├── hooks/              # App-specific hooks
-│   │   └── lib/                # App-only helpers (permissions, etc.)
-│   └── assets/                 # Fonts, images
-├── webapp/                     # Web-only frontend (React + Vite)
-│   └── src/
-│       ├── routes/             # Page routes
-│       ├── components/         # UI components
-│       └── lib/                # Supabase + mask helpers
-├── packages/
-│   ├── theme/                  # Design tokens + motion system (NO components)
-│   │   └── src/
-│   │       ├── tokens/         # Spacing, typography, elevation, colors
-│   │       ├── semantics/      # Light/dark theme color mappings
-│   │       └── motion/         # Durations, easing, springs, haptics
-│   ├── ui/                     # Reusable UI components (Box, Text, Button, etc.)
-│   ├── shared/                 # Domain types, Zod schemas, constants, utilities
-│   ├── supabase-client/        # Typed Supabase client + storage helpers
-│   └── vision/                 # Mask generation + image processing (pure funcs)
-└── docs/
-    ├── PRD.md                  # Product requirements
-    ├── decisions.md            # Architecture decision records
-    └── design-quality.md       # Design review checklist
+|-- backend/
+|   `-- supabase/               # Migrations + edge functions
+|-- mobapp/                     # Expo React Native app
+|   |-- app/                    # expo-router routes
+|   |-- src/
+|   |   |-- features/           # Feature modules (session, problem, share, mask)
+|   |   |-- components/         # App-specific components (if any)
+|   |   |-- hooks/              # App-specific hooks
+|   |   `-- lib/                # App-only helpers (permissions, etc.)
+|   `-- assets/                 # Fonts, images
+|-- webapp/                     # Web-only frontend (React + Vite)
+|   |-- src/
+|   |   |-- routes/             # Page routes
+|   |   |-- components/         # UI components
+|   |   |-- lib/                # Supabase + mask helpers
+|   |   `-- styles/             # Global CSS + tokens
+|   `-- index.html
+|-- packages/
+|   |-- theme/                  # Design tokens + motion system (no components)
+|   |-- ui/                     # Reusable UI components (mobile)
+|   |-- shared/                 # Domain types, schemas, constants, utils
+|   |-- supabase-client/        # Typed Supabase client + storage helpers
+|   `-- vision/                 # Mask generation + image processing (pure funcs)
+`-- docs/
+    |-- PRD.md
+    |-- webapp-spec.md
+    |-- decisions.md
+    `-- design-quality.md
 ```
 
 ### Package responsibilities
@@ -80,8 +85,8 @@ crux-journal/
 | Package | Purpose | Rules |
 |---------|---------|-------|
 | `@crux/theme` | Design tokens only | No React components. Exports tokens, themes, motion. |
-| `@crux/ui` | Component library | Built on theme + Reanimated. Screens use these. |
-| `@crux/shared` | Domain logic | No React, no Expo. Pure types/schemas/utils. |
+| `@crux/ui` | Component library (mobile) | Built on theme + Reanimated. Mobile screens use these. |
+| `@crux/shared` | Domain logic | No React, no Expo. Pure types, schemas, utils. |
 | `@crux/supabase-client` | API boundary | Only DB/storage operations. No UI logic. |
 | `@crux/vision` | Image processing | Pure functions. Unit-testable with fixtures. |
 
@@ -89,53 +94,46 @@ crux-journal/
 
 ## Design system (CRED-level quality)
 
-### Theming rules
+### Mobile design rules
+1. All tokens in `packages/theme` (spacing, typography, colors, elevation, motion).
+2. Semantic colors only: use `textPrimary`, `bgSurface`, etc. Never raw hex in screens.
+3. Components from `@crux/ui`: screens import `Box`, `Text`, `Button`, etc.
+4. No `StyleSheet.create` in screens. Use component props.
+5. Text variants only. Never set raw `fontSize`.
 
-1. **All tokens in one place**: `packages/theme` contains spacing, typography, colors, elevation, and motion.
+### Web app UI rules
+1. Use CSS variables from `webapp/src/styles/global.css` for colors, spacing, shadows.
+2. Keep font choices in `webapp/index.html` unless intentionally changing the brand.
+3. Prefer `webapp/src/components` primitives for buttons, inputs, cards, badges, chips.
+4. Motion: prefer keyframes defined in `webapp/src/styles/global.css`, avoid ad hoc inline animation.
 
-2. **Semantic colors only**: UI uses `textPrimary`, `bgSurface`, etc. Never raw hex codes.
-
-3. **Components from `@crux/ui`**: Screens import `Box`, `Text`, `Button`, etc. from the UI package.
-
-4. **No StyleSheet in screens**: Screens must not use `StyleSheet.create`. Use component props.
-
-5. **Text variants only**: Never set raw `fontSize`. Use `<Text variant="headingLarge">`.
-
-### Motion rules
-
-1. **Tokenized durations**: Use `durations.fast`, `durations.normal`, etc. Never `200`.
-
-2. **Tokenized easing**: Use `easing.emphasizedDecelerate`, etc. Never raw bezier curves.
-
-3. **Spring-based interactions**: Press animations use `springs.snappy`, not timed animations.
-
-4. **Haptics on interactions**: Buttons and toggles trigger appropriate haptic feedback.
-
-### Import boundaries (enforced via ESLint)
-
-```
-✅ mobapp → packages/*               (screens can import packages)
-✅ webapp → packages/*               (web app can import shared packages)
-✅ packages/ui → packages/theme       (UI uses tokens)
-✅ packages/supabase-client → packages/shared (client uses types)
-
-❌ mobapp → tokens/colors.ts          (screens cannot import raw colors)
-❌ mobapp → StyleSheet                (screens cannot define styles)
-❌ packages/shared → apps/*           (shared cannot depend on app)
-❌ packages/vision → expo/*           (vision must be pure)
-```
+### Motion rules (mobile)
+1. Tokenized durations: use `durations.fast`, `durations.normal`, etc. Never raw `200`.
+2. Tokenized easing: use `easing.emphasizedDecelerate`, etc. Never raw bezier curves.
+3. Spring-based interactions: press animations use `springs.snappy`, not timed animations.
+4. Haptics on interactions: buttons and toggles trigger appropriate haptic feedback.
 
 ### Design review
+Mobile: use the `/design-system` route (`mobapp/app/design-system.tsx`) to review typography, colors, buttons, cards, inputs, badges, skeleton loaders, and motion demos.  
+Web: review Sessions, Session Detail, Problem Detail, and Mask Editor flows in the web app.
 
-Use `/design-system` route to review:
-- Typography variants
-- Color swatches with theme toggle
-- Buttons in all variants × states
-- Cards, inputs, badges
-- Skeleton loaders
-- Motion demos
+See `docs/design-quality.md` for the full checklist.
 
-See `/docs/design-quality.md` for the full checklist.
+---
+
+## Import boundaries (target)
+
+Allowed:
+- mobapp -> packages/*
+- webapp -> packages/*
+- packages/ui -> packages/theme
+- packages/supabase-client -> packages/shared
+
+Forbidden:
+- mobapp -> webapp
+- webapp -> mobapp
+- packages/shared -> mobapp or webapp
+- packages/vision -> expo/* or DOM APIs
 
 ---
 
@@ -143,18 +141,27 @@ See `/docs/design-quality.md` for the full checklist.
 
 ### Root workspace
 - Install: `pnpm install`
-- Lint: `pnpm lint`
+- Lint (Biome): `pnpm lint`
+- Format: `pnpm format`
 - Typecheck: `pnpm typecheck`
 - Test: `pnpm test`
+- Config: `biome.json`
+
+### Web app
+- Setup env: copy `webapp/.env.example` to `webapp/.env`
+- Dev: `pnpm dev` or `pnpm -C webapp dev`
+- Build: `pnpm -C webapp build`
+- Preview: `pnpm -C webapp preview`
+- Typecheck: `pnpm -C webapp typecheck`
 
 ### Mobile app
 - Dev: `pnpm dev:mobile` or `pnpm -C mobapp start`
 - iOS: `pnpm ios`
 - Android: `pnpm android`
 
-### Web app
-- Dev: `pnpm dev` or `pnpm -C webapp dev`
-- Build: `pnpm -C webapp build`
+Quick run:
+- Web: `pnpm dev`
+- Mobile: `pnpm dev:mobile`
 
 ### Supabase
 - Start local: `pnpm supabase:start`
@@ -162,7 +169,7 @@ See `/docs/design-quality.md` for the full checklist.
 - Reset: `pnpm supabase:reset`
 - Generate types: `pnpm supabase:types`
 
-Before opening a PR, run **lint + typecheck** at minimum.
+Before opening a PR, run lint + typecheck at minimum.
 
 ---
 
@@ -172,15 +179,17 @@ Before opening a PR, run **lint + typecheck** at minimum.
 - Start with a short plan: what you'll change, files involved, and how correctness will be verified.
 - Prefer small, composable PRs over broad refactors.
 - Do not introduce new libraries unless they remove real complexity.
+- Primary testing target is the web app unless otherwise specified.
 
 ### Verifiable correctness
-- Every feature must have at least one "signal" that it works:
-  - a test,
-  - or a deterministic local repro documented in `/docs/repro.md`,
-  - or a script/command that validates behavior.
+- Every feature must have at least one signal that it works:
+  - a test, or
+  - a deterministic local repro documented in `docs/repro.md`, or
+  - a script/command that validates behavior.
 
 ### Style and hygiene
 - TypeScript `strict: true`. Avoid `any`; if unavoidable, isolate it and explain why.
+- Use Biome for linting/formatting. Do not add ESLint or Prettier configs.
 - No dead code, no unused dependencies, no "temporary" TODOs without an issue reference.
 - Keep UI logic thin; push non-UI logic into shared modules.
 
@@ -214,13 +223,16 @@ Events should be sufficient to reconstruct:
 
 ## Offline-first + sync (required pattern)
 
+### Scope
+Applies to mobapp (Expo + SQLite). Web app is online-first and may call Supabase directly unless explicitly asked to add offline-first behavior.
+
 ### Local-first writes
 All user actions write to local SQLite first. Nothing blocks on network.
 
 ### Outbox
 Maintain:
-- `outbox_events` (append-only, retryable)
-- `outbox_media` (photo/mask uploads, retryable)
+- outbox_events (append-only, retryable)
+- outbox_media (photo/mask uploads, retryable)
 
 ### Sync rules
 - Upload media first (deterministic storage paths).
@@ -236,7 +248,7 @@ Maintain:
 Generate an initial mask automatically without user tap:
 - Downscale photo for processing.
 - Color cluster (HSV/Lab).
-- Select the cluster most consistent with "holds" (high saturation, non-background, reasonable connected components).
+- Select the cluster most consistent with holds (high saturation, non-background, reasonable connected components).
 - Clean mask (morphology + small component removal).
 - Store as RouteMask v1 with method metadata + confidence.
 
@@ -249,14 +261,14 @@ Provide a fast editor:
 ### Non-goals (MVP)
 - Full ML hold detection training.
 - Accurate move sequence prediction.
-- "Perfect" grading.
+- Perfect grading.
 
 ---
 
 ## Sharing (required)
 
-- Share link deep-links to a `problem_id`.
-- Access is controlled by `problem_members` + Supabase RLS.
+- Share link deep-links to a problem_id.
+- Access is controlled by problem_members + Supabase RLS.
 - Joining creates membership and allows the user to create their own UserProblemLog for that problem.
 
 On the UI, show:
@@ -268,15 +280,15 @@ On the UI, show:
 ## Supabase standards
 
 ### Migrations
-- All schema changes via migrations in `/backend/supabase/migrations`.
-- Never "hot-edit" production schema.
+- All schema changes via migrations in `backend/supabase/migrations`.
+- Never hot-edit production schema.
 - Keep RLS policies explicit and tested by simple access checks.
 
 ### Storage
-- Separate buckets: `photos`, `masks`.
+- Separate buckets: photos, masks.
 - Use deterministic object keys:
-  - `photos/<problem_id>/<media_id>.jpg`
-  - `masks/<problem_id>/<mask_id>.png`
+  - photos/<problem_id>/<media_id>.jpg
+  - masks/<problem_id>/<mask_id>.png
 
 ### RLS (required)
 - A user can read a problem if:
@@ -295,9 +307,9 @@ On the UI, show:
 - Idempotency: event dedupe keys.
 
 ### Integration smoke checks
-- Offline capture → restart app → still present.
-- Later sync → server reflects correct state.
-- Share link join → second user can log.
+- Offline capture -> restart app -> still present.
+- Later sync -> server reflects correct state.
+- Share link join -> second user can log.
 
 If tests are missing, add at least one fixture-based test for the mask pipeline and one for the outbox/event flush.
 
@@ -308,20 +320,21 @@ If tests are missing, add at least one fixture-based test for the mask pipeline 
 - [ ] Lint + typecheck pass.
 - [ ] No secrets committed; no keys in repo.
 - [ ] RLS remains correct (no broad SELECT/INSERT).
-- [ ] Offline-first behavior preserved (no blocking network writes in core flows).
+- [ ] Offline-first behavior preserved for mobapp (no blocking network writes in core flows).
 - [ ] Events emitted for every state change.
 - [ ] Route masks are versioned, never overwritten.
 - [ ] Shared problem membership gates access.
-- [ ] UI uses @crux/ui components (no raw StyleSheet in screens).
+- [ ] Mobile UI uses @crux/ui components (no raw StyleSheet in screens).
 - [ ] Motion uses tokens (no hardcoded durations).
-- [ ] Touch targets ≥ 44pt.
+- [ ] Touch targets >= 44pt.
 
 ---
 
 ## Documentation expectations
 
 When behavior or schema changes:
-- Update `/docs/PRD.md` (only if product intent changes).
-- Add/append a short note in `/docs/decisions.md` describing the decision and why.
+- Update `docs/PRD.md` only if product intent changes.
+- Add/append a short note in `docs/decisions.md` describing the decision and why.
 - If a new command is required, document it in this file under Commands.
-- Review `/docs/design-quality.md` for UI changes.
+- Review `docs/design-quality.md` for UI changes.
+- Update `docs/webapp-spec.md` for web flow or UI changes.

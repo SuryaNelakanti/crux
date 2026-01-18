@@ -37,13 +37,17 @@ export async function readImagePixels(params: {
 
 const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
   new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error('Unable to encode image'));
-        return;
-      }
-      resolve(blob);
-    }, type, quality);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error('Unable to encode image'));
+          return;
+        }
+        resolve(blob);
+      },
+      type,
+      quality
+    );
   });
 
 export async function preparePhotoForUpload(file: File): Promise<{

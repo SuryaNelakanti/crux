@@ -1,36 +1,17 @@
 {
-    "extends": "../../tsconfig.json",
-    "compilerOptions": {
-        "strict": true,
-        "baseUrl": ".",
-        "paths": {
-            "@/*": [
-                "./src/*"
-            ],
-            "@crux/theme": [
-                "../packages/theme/src"
-            ],
-            "@crux/ui": [
-                "../packages/ui/src"
-            ],
-            "@crux/shared": [
-                "../packages/shared/src"
-            ],
-            "@crux/supabase-client": [
-                "../packages/supabase-client/src"
-            ],
-            "@crux/vision": [
-                "../packages/vision/src"
-            ]
-        }
-    },
-    "include": [
-        "**/*.ts",
-        "**/*.tsx",
-        ".expo/types/**/*.ts",
-        "expo-env.d.ts"
-    ],
-    "exclude": [
-        "node_modules"
-    ]
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@crux/theme": ["../packages/theme/src"],
+      "@crux/ui": ["../packages/ui/src"],
+      "@crux/shared": ["../packages/shared/src"],
+      "@crux/supabase-client": ["../packages/supabase-client/src"],
+      "@crux/vision": ["../packages/vision/src"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules"]
 }

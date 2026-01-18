@@ -1,14 +1,14 @@
 import {
+  type AppEvent,
   AUTO_MASK_CONFIDENCE_THRESHOLD,
   formatGradeRange,
   generateId,
-  type AppEvent,
   type Outcome,
 } from '@crux/shared';
 import { insertEvents, uploadMask, uploadPhoto } from '@crux/supabase-client';
-import { getSupabaseClient } from './supabase';
 import { preparePhotoForUpload } from './image';
 import { buildMaskRgba, generateMaskFromPhoto, rgbaToBlob } from './mask';
+import { getSupabaseClient } from './supabase';
 
 export interface SessionSummary {
   id: string;
@@ -96,9 +96,7 @@ const getPublicUrl = (path: string) => {
   return data.publicUrl ?? null;
 };
 
-const buildEvent = (
-  params: Omit<AppEvent, 'id' | 'clientTs' | 'serverTs'>
-): AppEvent => ({
+const buildEvent = (params: Omit<AppEvent, 'id' | 'clientTs' | 'serverTs'>): AppEvent => ({
   id: generateId(),
   clientTs: new Date(),
   serverTs: null,
@@ -107,21 +105,40 @@ const buildEvent = (
 
 export async function getAuthUser() {
   const client = getSupabaseClient();
-  const { data, error } = await client.auth.getUser();
-  if (error) throw new Error(error.message);
-  return data.user;
+  console.log('[getAuthUser] Calling client.auth.getUser()...');
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('getUser timeout after 5s')), 5000)
+  );
+  try {
+    const result = await Promise.race([client.auth.getUser(), timeoutPromise]);
+    const { data, error } = result as { data: { user: unknown }; error: unknown };
+    console.log('[getAuthUser] Result:', { user: data.user, error });
+    if (error) throw new Error(String(error));
+    return data.user;
+  } catch (err) {
+    console.error('[getAuthUser] Error:', err);
+    throw err;
+  }
 }
 
 export async function ensureUserProfile() {
   const client = getSupabaseClient();
+  console.log('[ensureUserProfile] Getting auth user...');
   const user = await getAuthUser();
+  console.log('[ensureUserProfile] Auth user:', user?.id);
   if (!user) return;
   const handle = user.email ? user.email.split('@')[0] : 'climber';
-  await client.from('users').upsert({
+  console.log('[ensureUserProfile] Upserting user with handle:', handle);
+  const { error } = await client.from('users').upsert({
     id: user.id,
     handle,
     created_at: new Date().toISOString(),
   });
+  if (error) {
+    console.error('[ensureUserProfile] Upsert error:', error);
+  } else {
+    console.log('[ensureUserProfile] Upsert complete');
+  }
 }
 
 export async function fetchSessions(): Promise<SessionSummary[]> {
@@ -151,7 +168,8 @@ export async function fetchSessions(): Promise<SessionSummary[]> {
 
   return sessionRows.map((row) => {
     const sessionProblems = (problems ?? []).filter(
-      (problem: { created_in_session_id: string | null }) => problem.created_in_session_id === row.id
+      (problem: { created_in_session_id: string | null }) =>
+        problem.created_in_session_id === row.id
     );
     const sessionLogs = (logs ?? []).filter(
       (log: { session_id: string }) => log.session_id === row.id
@@ -218,9 +236,7 @@ export async function endSession(sessionId: string): Promise<void> {
   ]);
 }
 
-export async function fetchProblemsForSession(
-  sessionId: string
-): Promise<ProblemCardItem[]> {
+export async function fetchProblemsForSession(sessionId: string): Promise<ProblemCardItem[]> {
   const client = getSupabaseClient();
   const user = await getAuthUser();
   if (!user) return [];
@@ -235,10 +251,7 @@ export async function fetchProblemsForSession(
   const problemIds = problemRows.map((row) => row.id);
   if (problemIds.length === 0) return [];
 
-  const { data: media } = await client
-    .from('media')
-    .select('*')
-    .in('problem_id', problemIds);
+  const { data: media } = await client.from('media').select('*').in('problem_id', problemIds);
 
   const { data: routeMasks } = await client
     .from('route_masks')
@@ -256,9 +269,7 @@ export async function fetchProblemsForSession(
   const logRows = (logs ?? []) as LogRow[];
 
   return problemRows.map((problem) => {
-    const primaryMedia = mediaRows.find(
-      (entry) => entry.id === problem.primary_media_id
-    );
+    const primaryMedia = mediaRows.find((entry) => entry.id === problem.primary_media_id);
     const mask = maskRows
       .filter((entry) => entry.problem_id === problem.id)
       .sort((a, b) => b.version - a.version)[0];
@@ -292,10 +303,7 @@ export async function fetchProblemDetail(problemId: string): Promise<ProblemDeta
     .single();
   if (error || !problem) return null;
 
-  const { data: media } = await client
-    .from('media')
-    .select('*')
-    .eq('problem_id', problemId);
+  const { data: media } = await client.from('media').select('*').eq('problem_id', problemId);
 
   const { data: routeMasks } = await client
     .from('route_masks')
@@ -352,6 +360,24 @@ export async function createProblemFromUpload(params: {
   const photoMediaId = generateId();
 
   const processed = await preparePhotoForUpload(params.file);
+
+  const { error: problemError } = await client.from('problems').insert({
+    id: problemId,
+    created_by: user.id,
+    created_at: now.toISOString(),
+    created_in_session_id: params.sessionId,
+    primary_media_id: null,
+    photo_phash: null,
+  });
+  if (problemError) throw new Error(problemError.message);
+
+  await client.from('problem_members').insert({
+    problem_id: problemId,
+    user_id: user.id,
+    role: 'owner',
+    joined_at: now.toISOString(),
+  });
+
   const upload = await uploadPhoto(problemId, photoMediaId, processed.photoBlob);
 
   const { error: mediaError } = await client.from('media').insert({
@@ -370,22 +396,11 @@ export async function createProblemFromUpload(params: {
   });
   if (mediaError) throw new Error(mediaError.message);
 
-  const { error: problemError } = await client.from('problems').insert({
-    id: problemId,
-    created_by: user.id,
-    created_at: now.toISOString(),
-    created_in_session_id: params.sessionId,
-    primary_media_id: photoMediaId,
-    photo_phash: null,
-  });
-  if (problemError) throw new Error(problemError.message);
-
-  await client.from('problem_members').insert({
-    problem_id: problemId,
-    user_id: user.id,
-    role: 'owner',
-    joined_at: now.toISOString(),
-  });
+  const { error: problemUpdateError } = await client
+    .from('problems')
+    .update({ primary_media_id: photoMediaId })
+    .eq('id', problemId);
+  if (problemUpdateError) throw new Error(problemUpdateError.message);
 
   await insertEvents([
     buildEvent({
@@ -393,7 +408,11 @@ export async function createProblemFromUpload(params: {
       sessionId: params.sessionId,
       problemId,
       type: 'problem_created',
-      payloadJson: { problemId, createdInSessionId: params.sessionId, primaryMediaId: photoMediaId },
+      payloadJson: {
+        problemId,
+        createdInSessionId: params.sessionId,
+        primaryMediaId: photoMediaId,
+      },
     }),
     buildEvent({
       userId: user.id,

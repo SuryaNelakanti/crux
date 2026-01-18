@@ -1,15 +1,15 @@
 export {
-    generateAutoMaskForProblem,
-    generateSeedMaskForProblem,
-    saveEditedMaskForProblem,
-    createBlankMaskForProblem,
-    getActiveRouteMaskForProblem,
+  createBlankMaskForProblem,
+  generateAutoMaskForProblem,
+  generateSeedMaskForProblem,
+  getActiveRouteMaskForProblem,
+  saveEditedMaskForProblem,
 } from './actions.web';
 
 export {
-    applyBrushToMask,
-    buildMaskRgba,
-    createMaskImage,
-    loadMaskPixels,
-    maskTint,
+  applyBrushToMask,
+  buildMaskRgba,
+  createMaskImage,
+  loadMaskPixels,
+  maskTint,
 } from './processing.web';

@@ -1,8 +1,8 @@
 /**
  * @crux/vision
- * 
+ *
  * Image processing and mask generation for Crux app.
- * 
+ *
  * Rules:
  * - Pure functions only (no side effects)
  * - No React, no Expo, no platform APIs
@@ -12,26 +12,26 @@
 
 // Color utilities
 export {
-    rgbToHsl,
-    hslToRgb,
-    rgbToLab,
-    colorDistanceLab,
-    colorDistanceRgb,
-    isSaturated,
-    getDominantHue,
-    type RGB,
-    type HSL,
-    type LAB,
+  colorDistanceLab,
+  colorDistanceRgb,
+  getDominantHue,
+  type HSL,
+  hslToRgb,
+  isSaturated,
+  type LAB,
+  type RGB,
+  rgbToHsl,
+  rgbToLab,
 } from './color';
 
 // Mask generation
 export {
-    generateMask,
-    clusterColors,
-    scoreCluster,
-    cleanupMask,
-    calculateConfidence,
-    type MaskGenerationInput,
-    type MaskGenerationResult,
-    type ColorCluster,
+  type ColorCluster,
+  calculateConfidence,
+  cleanupMask,
+  clusterColors,
+  generateMask,
+  type MaskGenerationInput,
+  type MaskGenerationResult,
+  scoreCluster,
 } from './mask';

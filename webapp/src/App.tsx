@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Route, Routes } from 'react-router-dom';
-import { AuthRoute } from '@/routes/Auth';
-import { SessionsRoute } from '@/routes/Sessions';
-import { SessionDetailRoute } from '@/routes/SessionDetail';
-import { ProblemDetailRoute } from '@/routes/ProblemDetail';
-import { MaskEditorRoute } from '@/routes/MaskEditor';
 import { ensureUserProfile } from '@/lib/api';
 import { initSupabaseClient } from '@/lib/supabase';
+import { AuthRoute } from '@/routes/Auth';
+import { MaskEditorRoute } from '@/routes/MaskEditor';
+import { ProblemDetailRoute } from '@/routes/ProblemDetail';
+import { SessionDetailRoute } from '@/routes/SessionDetail';
+import { SessionsRoute } from '@/routes/Sessions';
 
 export function App() {
   const [ready, setReady] = useState(false);

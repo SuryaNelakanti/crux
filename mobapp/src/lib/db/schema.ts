@@ -1,5 +1,5 @@
-import * as SQLite from 'expo-sqlite';
 import { generateId } from '@crux/shared';
+import * as SQLite from 'expo-sqlite';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -152,103 +152,98 @@ create table if not exists sync_state (
 );
 `;
 
-export const toIso = (value: Date | null): string | null =>
-    value ? value.toISOString() : null;
+export const toIso = (value: Date | null): string | null => (value ? value.toISOString() : null);
 
-export const fromIso = (value: string | null): Date | null =>
-    value ? new Date(value) : null;
+export const fromIso = (value: string | null): Date | null => (value ? new Date(value) : null);
 
 export const parseJson = <T>(value: string | null, fallback: T): T => {
-    if (!value) return fallback;
-    try {
-        return JSON.parse(value) as T;
-    } catch {
-        return fallback;
-    }
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
 };
 
 export async function getDb(): Promise<SQLite.SQLiteDatabase> {
-    if (!dbPromise) {
-        dbPromise = SQLite.openDatabaseAsync('crux.db');
-    }
-    return dbPromise;
+  if (!dbPromise) {
+    dbPromise = SQLite.openDatabaseAsync('crux.db');
+  }
+  return dbPromise;
 }
 
 export async function initDb(): Promise<{
-    db: SQLite.SQLiteDatabase;
-    localUserId: string;
+  db: SQLite.SQLiteDatabase;
+  localUserId: string;
 }> {
-    const db = await getDb();
-    await db.execAsync(SCHEMA_SQL);
+  const db = await getDb();
+  await db.execAsync(SCHEMA_SQL);
 
-    const existingState = await db.getFirstAsync<{ local_user_id: string | null }>(
-        'select local_user_id from sync_state where id = 1'
+  const existingState = await db.getFirstAsync<{ local_user_id: string | null }>(
+    'select local_user_id from sync_state where id = 1'
+  );
+
+  if (!existingState) {
+    const localUserId = generateId();
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'insert into sync_state (id, local_user_id, last_server_ts, last_sync_at) values (1, ?, null, null)',
+      [localUserId]
     );
+    await db.runAsync('insert into users (id, handle, created_at) values (?, null, ?)', [
+      localUserId,
+      now,
+    ]);
+    return { db, localUserId };
+  }
 
-    if (!existingState) {
-        const localUserId = generateId();
-        const now = new Date().toISOString();
-        await db.runAsync(
-            'insert into sync_state (id, local_user_id, last_server_ts, last_sync_at) values (1, ?, null, null)',
-            [localUserId]
-        );
-        await db.runAsync(
-            'insert into users (id, handle, created_at) values (?, null, ?)',
-            [localUserId, now]
-        );
-        return { db, localUserId };
-    }
+  if (!existingState.local_user_id) {
+    const localUserId = generateId();
+    const now = new Date().toISOString();
+    await db.runAsync('update sync_state set local_user_id = ? where id = 1', [localUserId]);
+    await db.runAsync('insert into users (id, handle, created_at) values (?, null, ?)', [
+      localUserId,
+      now,
+    ]);
+    return { db, localUserId };
+  }
 
-    if (!existingState.local_user_id) {
-        const localUserId = generateId();
-        const now = new Date().toISOString();
-        await db.runAsync(
-            'update sync_state set local_user_id = ? where id = 1',
-            [localUserId]
-        );
-        await db.runAsync(
-            'insert into users (id, handle, created_at) values (?, null, ?)',
-            [localUserId, now]
-        );
-        return { db, localUserId };
-    }
-
-    return { db, localUserId: existingState.local_user_id };
+  return { db, localUserId: existingState.local_user_id };
 }
 
 export async function getLocalUserId(): Promise<string> {
-    const { localUserId } = await initDb();
-    return localUserId;
+  const { localUserId } = await initDb();
+  return localUserId;
 }
 
 export async function getSyncState(): Promise<{
-    lastServerTs: Date | null;
-    lastSyncAt: Date | null;
-    localUserId: string | null;
+  lastServerTs: Date | null;
+  lastSyncAt: Date | null;
+  localUserId: string | null;
 }> {
-    const db = await getDb();
-    const row = await db.getFirstAsync<{
-        local_user_id: string | null;
-        last_server_ts: string | null;
-        last_sync_at: string | null;
-    }>('select local_user_id, last_server_ts, last_sync_at from sync_state where id = 1');
-    if (!row) {
-        return { lastServerTs: null, lastSyncAt: null, localUserId: null };
-    }
-    return {
-        localUserId: row.local_user_id,
-        lastServerTs: fromIso(row.last_server_ts),
-        lastSyncAt: fromIso(row.last_sync_at),
-    };
+  const db = await getDb();
+  const row = await db.getFirstAsync<{
+    local_user_id: string | null;
+    last_server_ts: string | null;
+    last_sync_at: string | null;
+  }>('select local_user_id, last_server_ts, last_sync_at from sync_state where id = 1');
+  if (!row) {
+    return { lastServerTs: null, lastSyncAt: null, localUserId: null };
+  }
+  return {
+    localUserId: row.local_user_id,
+    lastServerTs: fromIso(row.last_server_ts),
+    lastSyncAt: fromIso(row.last_sync_at),
+  };
 }
 
 export async function updateSyncState(params: {
-    lastServerTs: Date | null;
-    lastSyncAt: Date | null;
+  lastServerTs: Date | null;
+  lastSyncAt: Date | null;
 }): Promise<void> {
-    const db = await getDb();
-    await db.runAsync(
-        'update sync_state set last_server_ts = ?, last_sync_at = ? where id = 1',
-        [toIso(params.lastServerTs), toIso(params.lastSyncAt)]
-    );
+  const db = await getDb();
+  await db.runAsync('update sync_state set last_server_ts = ?, last_sync_at = ? where id = 1', [
+    toIso(params.lastServerTs),
+    toIso(params.lastSyncAt),
+  ]);
 }

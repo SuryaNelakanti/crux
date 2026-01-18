@@ -1,47 +1,37 @@
 {
-    "expo": {
-        "name": "Crux",
-        "slug": "crux",
-        "version": "0.0.1",
-        "orientation": "portrait",
-        "icon": "./assets/icon.png",
-        "userInterfaceStyle": "automatic",
-        "scheme": "crux",
-        "splash": {
-            "image": "./assets/splash.png",
-            "resizeMode": "contain",
-            "backgroundColor": "#F7F8FA"
-        },
-        "assetBundlePatterns": [
-            "**/*"
-        ],
-        "ios": {
-            "supportsTablet": false,
-            "bundleIdentifier": "com.crux.app",
-            "infoPlist": {
-                "NSCameraUsageDescription": "Capture problem photos for your climbing journal.",
-                "NSPhotoLibraryUsageDescription": "Upload photos to your climbing journal."
-            }
-        },
-        "android": {
-            "adaptiveIcon": {
-                "foregroundImage": "./assets/adaptive-icon.png",
-                "backgroundColor": "#F7F8FA"
-            },
-            "package": "com.crux.app",
-            "permissions": [
-                "CAMERA",
-                "READ_MEDIA_IMAGES",
-                "READ_EXTERNAL_STORAGE"
-            ]
-        },
-        "plugins": [
-            "expo-router",
-            "expo-font",
-            "expo-camera"
-        ],
-        "experiments": {
-            "typedRoutes": true
-        }
+  "expo": {
+    "name": "Crux",
+    "slug": "crux",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "crux",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F7F8FA"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.crux.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Capture problem photos for your climbing journal.",
+        "NSPhotoLibraryUsageDescription": "Upload photos to your climbing journal."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F7F8FA"
+      },
+      "package": "com.crux.app",
+      "permissions": ["CAMERA", "READ_MEDIA_IMAGES", "READ_EXTERNAL_STORAGE"]
+    },
+    "plugins": ["expo-router", "expo-font", "expo-camera"],
+    "experiments": {
+      "typedRoutes": true
     }
+  }
 }

@@ -1,6 +1,6 @@
 /**
  * Share feature module
- * 
+ *
  * Handles problem sharing:
  * - Create share link
  * - Resolve share link
@@ -9,4 +9,4 @@
  */
 
 // Re-export from submodules when implemented
-export { };
+export {};
