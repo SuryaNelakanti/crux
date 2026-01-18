@@ -28,6 +28,7 @@ export function MaskEditorRoute() {
   const { problemId } = useParams();
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const offscreenRef = useRef<HTMLCanvasElement | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [maskData, setMaskData] = useState<Uint8Array | null>(null);
   const [rgbaData, setRgbaData] = useState<Uint8Array | null>(null);
@@ -49,6 +50,61 @@ export function MaskEditorRoute() {
     seedColor?: HSL;
     confidence?: number | null;
   }>({ method: 'manual-edit' });
+
+  const getCoverTransform = (containerWidth: number, containerHeight: number) => {
+    if (!maskSize) {
+      return { scale: 1, drawWidth: containerWidth, drawHeight: containerHeight, offsetX: 0, offsetY: 0 };
+    }
+    const scale = Math.max(containerWidth / maskSize.width, containerHeight / maskSize.height);
+    const drawWidth = maskSize.width * scale;
+    const drawHeight = maskSize.height * scale;
+    const offsetX = (drawWidth - containerWidth) / 2;
+    const offsetY = (drawHeight - containerHeight) / 2;
+    return { scale, drawWidth, drawHeight, offsetX, offsetY };
+  };
+
+  const mapPointerToMask = (clientX: number, clientY: number) => {
+    if (!canvasRef.current || !maskSize) return null;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const { scale, offsetX, offsetY } = getCoverTransform(rect.width, rect.height);
+    const x = (clientX - rect.left + offsetX) / scale;
+    const y = (clientY - rect.top + offsetY) / scale;
+    const clampedX = Math.min(maskSize.width - 1, Math.max(0, Math.round(x)));
+    const clampedY = Math.min(maskSize.height - 1, Math.max(0, Math.round(y)));
+    return { x: clampedX, y: clampedY };
+  };
+
+  const renderMaskOverlay = () => {
+    if (!canvasRef.current || !rgbaData || !maskSize) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const offscreen = offscreenRef.current ?? document.createElement('canvas');
+    offscreenRef.current = offscreen;
+    if (offscreen.width !== maskSize.width || offscreen.height !== maskSize.height) {
+      offscreen.width = maskSize.width;
+      offscreen.height = maskSize.height;
+    }
+    const offCtx = offscreen.getContext('2d');
+    if (!offCtx) return;
+    const imageData = new ImageData(
+      new Uint8ClampedArray(rgbaData),
+      maskSize.width,
+      maskSize.height
+    );
+    offCtx.putImageData(imageData, 0, 0);
+
+    const { drawWidth, drawHeight, offsetX, offsetY } = getCoverTransform(rect.width, rect.height);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.drawImage(offscreen, -offsetX, -offsetY, drawWidth, drawHeight);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -98,17 +154,7 @@ export function MaskEditorRoute() {
   }, [problemId]);
 
   useEffect(() => {
-    if (!canvasRef.current || !rgbaData || !maskSize) return;
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-    canvasRef.current.width = maskSize.width;
-    canvasRef.current.height = maskSize.height;
-    const imageData = new ImageData(
-      new Uint8ClampedArray(rgbaData),
-      maskSize.width,
-      maskSize.height
-    );
-    ctx.putImageData(imageData, 0, 0);
+    renderMaskOverlay();
   }, [rgbaData, maskSize]);
 
   const getBrushRadius = () => {
@@ -121,29 +167,21 @@ export function MaskEditorRoute() {
 
   const paintAt = (clientX: number, clientY: number) => {
     if (!canvasRef.current || !maskData || !rgbaData || !maskSize) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.round(((clientX - rect.left) / rect.width) * maskSize.width);
-    const y = Math.round(((clientY - rect.top) / rect.height) * maskSize.height);
+    const point = mapPointerToMask(clientX, clientY);
+    if (!point) return;
     applyBrushToMask({
       mask: maskData,
       rgba: rgbaData,
       width: maskSize.width,
       height: maskSize.height,
-      x,
-      y,
+      x: point.x,
+      y: point.y,
       radius: getBrushRadius(),
       mode,
       tint: maskTint,
     });
     setMaskMeta((prev) => (prev.method === 'manual-edit' ? prev : { method: 'manual-edit' }));
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-    const imageData = new ImageData(
-      new Uint8ClampedArray(rgbaData),
-      maskSize.width,
-      maskSize.height
-    );
-    ctx.putImageData(imageData, 0, 0);
+    renderMaskOverlay();
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -178,16 +216,34 @@ export function MaskEditorRoute() {
     try {
       const sample = await ensurePhotoSample();
       if (!sample) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = Math.round(((clientX - rect.left) / rect.width) * sample.width);
-      const y = Math.round(((clientY - rect.top) / rect.height) * sample.height);
-      const clampedX = Math.min(sample.width - 1, Math.max(0, x));
-      const clampedY = Math.min(sample.height - 1, Math.max(0, y));
+      const point = mapPointerToMask(clientX, clientY);
+      if (!point) return;
+      const scaleX = sample.width / maskSize.width;
+      const scaleY = sample.height / maskSize.height;
+      const clampedX = Math.min(sample.width - 1, Math.max(0, Math.round(point.x * scaleX)));
+      const clampedY = Math.min(sample.height - 1, Math.max(0, Math.round(point.y * scaleY)));
       const offset = (clampedY * sample.width + clampedX) * 4;
+      const seedWindow = 4;
+      let sumR = 0;
+      let sumG = 0;
+      let sumB = 0;
+      let count = 0;
+      for (let dy = -seedWindow; dy <= seedWindow; dy += 1) {
+        for (let dx = -seedWindow; dx <= seedWindow; dx += 1) {
+          const sx = clampedX + dx;
+          const sy = clampedY + dy;
+          if (sx < 0 || sy < 0 || sx >= sample.width || sy >= sample.height) continue;
+          const sOffset = (sy * sample.width + sx) * 4;
+          sumR += sample.pixels[sOffset];
+          sumG += sample.pixels[sOffset + 1];
+          sumB += sample.pixels[sOffset + 2];
+          count += 1;
+        }
+      }
       const seedColor = rgbToHsl({
-        r: sample.pixels[offset],
-        g: sample.pixels[offset + 1],
-        b: sample.pixels[offset + 2],
+        r: count ? Math.round(sumR / count) : sample.pixels[offset],
+        g: count ? Math.round(sumG / count) : sample.pixels[offset + 1],
+        b: count ? Math.round(sumB / count) : sample.pixels[offset + 2],
       });
 
       const result = await generateMaskFromPhoto({
@@ -199,7 +255,11 @@ export function MaskEditorRoute() {
       setMaskData(result.mask);
       setRgbaData(rgba);
       setMaskSize({ width: result.width, height: result.height });
-      setMaskMeta({ method: result.method, seedColor: result.seedColor, confidence: result.confidence });
+      setMaskMeta({
+        method: result.method,
+        seedColor: result.seedColor,
+        confidence: result.confidence,
+      });
     } finally {
       setIsRegenerating(false);
       setIsPickingColor(false);

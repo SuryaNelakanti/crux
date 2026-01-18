@@ -246,3 +246,27 @@ stronger tint and normal blend mode.
 - Users can re-mask quickly without full manual edits
 - Saved mask versions capture whether they were auto/seed/manual
 - Overlay readability improves across photo lighting conditions
+
+---
+
+## ADR-011: Cover-aware mask editing + seeded clustering
+
+**Date:** 2026-01-18
+
+**Status:** Accepted
+
+**Context:**
+Mask edits were drifting when viewed later because the editor used object-fit cover
+without mapping pointer coordinates to the cropped region. Seeded masks also felt
+inconsistent when the selected color didn't align with cluster centers.
+
+**Decision:**
+Render the editor overlay with a cover transform and map pointer coordinates
+through the same transform. When a seed color is provided, still compute clusters
+and choose the nearest cluster center, with adaptive thresholds and smaller
+component filtering for better hold capture.
+
+**Consequences:**
+- Edits align with the preview and saved mask positions
+- Seeded masks are more stable on real photos
+- Slightly more CPU during mask generation and redraw

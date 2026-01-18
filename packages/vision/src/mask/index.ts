@@ -16,12 +16,18 @@ const KMEANS_ITERS = 6;
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
+const HUE_WEIGHT = 1.15;
+const SAT_WEIGHT = 0.75;
+const LIGHT_WEIGHT = 0.55;
+
 const hslDistance = (a: HSL, b: HSL): number => {
   const rawHue = Math.abs(a.h - b.h);
   const hue = Math.min(rawHue, 360 - rawHue) / 180; // 0..1
   const sat = (a.s - b.s) / 100;
   const light = (a.l - b.l) / 100;
-  return Math.sqrt(hue * hue + sat * sat + light * light);
+  return Math.sqrt(
+    (hue * HUE_WEIGHT) ** 2 + (sat * SAT_WEIGHT) ** 2 + (light * LIGHT_WEIGHT) ** 2
+  );
 };
 
 const toHueVector = (h: number): { sin: number; cos: number } => {
@@ -135,17 +141,44 @@ export function generateMask(input: MaskGenerationInput): MaskGenerationResult {
     };
   }
 
-  const clusters = seedColor ? [] : clusterColors(input.pixels, width, height, DEFAULT_K);
+  const clusters = clusterColors(input.pixels, width, height, DEFAULT_K);
 
-  const selectedSeed = seedColor ?? clusters[0]?.center ?? { h: 0, s: 0, l: 50 };
   const method: MaskGenerationResult['method'] = seedColor ? 'seed-color' : 'auto';
+  let selectedSeed = seedColor ?? clusters[0]?.center ?? { h: 0, s: 0, l: 50 };
+  let selectedClusterIndex = clusters.length ? 0 : -1;
+
+  if (seedColor && clusters.length > 0) {
+    let closestIndex = 0;
+    let closestDistance = Infinity;
+    for (let i = 0; i < clusters.length; i += 1) {
+      const distance = hslDistance(clusters[i].center, seedColor);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = i;
+      }
+    }
+    selectedClusterIndex = closestIndex;
+    selectedSeed = clusters[closestIndex]?.center ?? selectedSeed;
+  }
 
   const threshold = (() => {
-    if (seedColor || clusters.length < 2) return 0.2;
-    const distances = clusters.slice(1).map((cluster) => hslDistance(cluster.center, selectedSeed));
-    const nearest = distances.length ? Math.min(...distances) : 0.2;
-    return clamp(nearest * 0.45, 0.08, 0.22);
+    if (clusters.length < 2) {
+      return seedColor ? 0.26 : 0.2;
+    }
+    const distances = clusters
+      .map((cluster, index) =>
+        index === selectedClusterIndex ? null : hslDistance(cluster.center, selectedSeed)
+      )
+      .filter((value): value is number => value !== null);
+    const nearest = distances.length ? Math.min(...distances) : seedColor ? 0.26 : 0.2;
+    const multiplier = seedColor ? 0.62 : 0.45;
+    const min = seedColor ? 0.12 : 0.08;
+    const max = seedColor ? 0.3 : 0.22;
+    return clamp(nearest * multiplier, min, max);
   })();
+
+  const saturationFloor =
+    seedColor && seedColor.s > 35 ? Math.min(22, Math.round(seedColor.s - 35)) : 0;
 
   for (let i = 0; i < width * height; i += 1) {
     const offset = i * 4;
@@ -155,6 +188,7 @@ export function generateMask(input: MaskGenerationInput): MaskGenerationResult {
       b: input.pixels[offset + 2],
     };
     const hsl = rgbToHsl(rgb);
+    if (saturationFloor && hsl.s < saturationFloor) continue;
     const distance = hslDistance(hsl, selectedSeed);
     if (distance <= threshold) {
       mask[i] = 1;
@@ -353,7 +387,7 @@ function dilate(mask: Uint8Array, width: number, height: number): Uint8Array {
 function removeSmallComponents(mask: Uint8Array, width: number, height: number): Uint8Array {
   const visited = new Uint8Array(mask.length);
   const result = new Uint8Array(mask);
-  const minSize = Math.max(24, Math.floor(width * height * 0.002));
+  const minSize = Math.max(24, Math.floor(width * height * 0.0008));
 
   const stack: number[] = [];
   for (let i = 0; i < mask.length; i += 1) {

@@ -51,6 +51,7 @@
 - Canvas-based overlay.
 - Brush add/erase, adjustable size.
 - Pick hold color to re-run auto mask before brushing.
+- Editor aligns overlay using cover-aware mapping so saved masks match preview.
 - Save writes a new mask version and uploads PNG.
 
 ## UI System
