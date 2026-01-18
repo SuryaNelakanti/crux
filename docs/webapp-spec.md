@@ -48,10 +48,11 @@
 7. Create route mask version row + mask media row.
 
 ## Mask Editing (Web)
-- Canvas-based overlay.
-- Brush add/erase, adjustable size.
-- Pick hold color to re-run auto mask before brushing.
-- Editor aligns overlay using cover-aware mapping so saved masks match preview.
+- Canvas-based overlay with a Select route vs Edit mask mode toggle in the header.
+- Auto-outline all holds (color clustering + components) with outline-only rendering.
+- Tap a hold to auto-select the full route (same color cluster).
+- Brush add/erase for quick corrections (first-class edit mode).
+- Editor aligns overlay using contain mapping so saved masks match preview.
 - Save writes a new mask version and uploads PNG.
 
 ## UI System

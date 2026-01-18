@@ -40,6 +40,9 @@ ios/build/
 # Testing
 coverage/
 
+# Local debug outputs
+scripts/output/
+
 # Supabase
 supabase/.branches
 supabase/.temp

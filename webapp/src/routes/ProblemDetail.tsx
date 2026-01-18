@@ -1,199 +1,246 @@
-import { OUTCOME_OPTIONS, type Outcome } from '@crux/shared';
-import { useEffect, useState } from 'react';
+import { type Outcome } from '@crux/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { DoodleArrow, DoodleWave, Sparkle } from '@/components/Doodle';
-import { Badge, Button, Card, Input, Segmented, Textarea } from '@/components/ui';
-import { fetchProblemDetail, getMaskConfidenceLabel, saveProblemLog } from '@/lib/api';
-
-const MASK_VIEW_OPTIONS = [
-  { value: 'photo', label: 'Photo' },
-  { value: 'mask', label: 'Mask' },
-] as const;
+import { Skeleton } from '@/components/Skeleton';
+import {
+  Button,
+  GradeSelector,
+  Input,
+  OutcomeChips,
+  Segmented,
+  Textarea,
+  Toast,
+} from '@/components/ui';
+import { fetchProblemDetail, saveProblemLog, saveMaskVersion } from '@/lib/api';
+import { readImagePixels } from '@/lib/image';
+import {
+  applyBrushToMask,
+  buildMaskRgba,
+  generateMaskFromPhoto,
+  loadMaskPixelsFromUrl,
+  maskTint,
+} from '@/lib/mask';
 
 export function ProblemDetailRoute() {
   const { problemId } = useParams();
   const navigate = useNavigate();
-  const [detail, setDetail] = useState<Awaited<ReturnType<typeof fetchProblemDetail>> | null>(null);
-  const [maskView, setMaskView] = useState<'photo' | 'mask'>('photo');
-  const [outcome, setOutcome] = useState<Outcome>('tried');
-  const [attempts, setAttempts] = useState('');
-  const [gradeMin, setGradeMin] = useState('');
-  const [gradeMax, setGradeMax] = useState('');
-  const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  useEffect(() => {
-    const load = async () => {
-      if (!problemId) return;
+  const [detail, setDetail] = useState<Awaited<ReturnType<typeof fetchProblemDetail>> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<'photo' | 'mask'>('photo');
+  const [editingMask, setEditingMask] = useState(false);
+
+  const [outcome, setOutcome] = useState<Outcome>('tried');
+  const [grade, setGrade] = useState<number | null>(null);
+  const [attempts, setAttempts] = useState('');
+  const [note, setNote] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('Saved');
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [maskData, setMaskData] = useState<Uint8Array | null>(null);
+  const [rgbaData, setRgbaData] = useState<Uint8Array | null>(null);
+  const [maskSize, setMaskSize] = useState<{ width: number; height: number } | null>(null);
+  const [brushMode, setBrushMode] = useState<'add' | 'erase'>('add');
+  const [brushSize, setBrushSize] = useState<'S' | 'M' | 'L'>('M');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [savingMask, setSavingMask] = useState(false);
+
+  const loadDetail = useCallback(async () => {
+    if (!problemId) return;
+    setLoading(true);
+    try {
       const data = await fetchProblemDetail(problemId);
       setDetail(data);
       if (data?.log) {
         setOutcome(data.log.outcome);
+        setGrade(data.log.gradeMin ?? data.log.gradeMax ?? null);
         setAttempts(data.log.attemptsCount?.toString() ?? '');
-        setGradeMin(data.log.gradeMin?.toString() ?? '');
-        setGradeMax(data.log.gradeMax?.toString() ?? '');
         setNote(data.log.note ?? '');
       }
-      setMaskView(data?.maskUrl ? 'mask' : 'photo');
-    };
-    void load();
+      setView(data?.maskUrl ? 'mask' : 'photo');
+
+      if (data?.maskUrl) {
+        const loaded = await loadMaskPixelsFromUrl(data.maskUrl);
+        setMaskData(loaded.mask);
+        setRgbaData(loaded.rgba);
+        setMaskSize({ width: loaded.width, height: loaded.height });
+      } else if (data?.media.width && data?.media.height) {
+        setMaskData(new Uint8Array(data.media.width * data.media.height));
+        setRgbaData(new Uint8Array(data.media.width * data.media.height * 4));
+        setMaskSize({ width: data.media.width, height: data.media.height });
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [problemId]);
 
-  const handleSave = async () => {
+  useEffect(() => { void loadDetail(); }, [loadDetail]);
+
+  useEffect(() => {
+    if (!canvasRef.current || !rgbaData || !maskSize || !editingMask) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+    canvasRef.current.width = maskSize.width;
+    canvasRef.current.height = maskSize.height;
+    ctx.putImageData(new ImageData(new Uint8ClampedArray(rgbaData), maskSize.width, maskSize.height), 0, 0);
+  }, [rgbaData, maskSize, editingMask]);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 1500);
+  };
+
+  const saveLog = async () => {
     if (!problemId || !detail?.sessionId) return;
-    setSaving(true);
+    await saveProblemLog({
+      problemId,
+      sessionId: detail.sessionId,
+      outcome,
+      attemptsCount: attempts ? Number(attempts) : null,
+      gradeMin: grade,
+      gradeMax: grade,
+      note: note.trim() || null,
+    });
+    showToast('Saved ✓');
+  };
+
+  useEffect(() => {
+    if (!detail) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => void saveLog(), 800);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [outcome, grade, attempts, note]);
+
+  const getRadius = () => {
+    if (!maskSize) return 12;
+    const base = Math.max(6, Math.round(maskSize.width * 0.015));
+    return brushSize === 'S' ? base : brushSize === 'L' ? base * 2.5 : base * 1.6;
+  };
+
+  const paintAt = (x: number, y: number) => {
+    if (!canvasRef.current || !maskData || !rgbaData || !maskSize) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const px = Math.round(((x - rect.left) / rect.width) * maskSize.width);
+    const py = Math.round(((y - rect.top) / rect.height) * maskSize.height);
+    applyBrushToMask({ mask: maskData, rgba: rgbaData, width: maskSize.width, height: maskSize.height, x: px, y: py, radius: getRadius(), mode: brushMode, tint: maskTint });
+    const ctx = canvasRef.current.getContext('2d');
+    if (ctx) ctx.putImageData(new ImageData(new Uint8ClampedArray(rgbaData), maskSize.width, maskSize.height), 0, 0);
+  };
+
+  const handleAutoMask = async () => {
+    if (!detail?.imageUrl || !maskSize) return;
+    const result = await generateMaskFromPhoto({ uri: detail.imageUrl, maxWidth: maskSize.width });
+    setMaskData(result.mask);
+    setRgbaData(buildMaskRgba(result.mask, result.width, result.height));
+    setMaskSize({ width: result.width, height: result.height });
+  };
+
+  const handleSaveMask = async () => {
+    if (!problemId || !maskData || !maskSize || savingMask) return;
+    setSavingMask(true);
     try {
-      await saveProblemLog({
-        problemId,
-        sessionId: detail.sessionId,
-        outcome,
-        attemptsCount: attempts ? Number(attempts) : null,
-        gradeMin: gradeMin ? Number(gradeMin) : null,
-        gradeMax: gradeMax ? Number(gradeMax) : null,
-        note: note.trim() === '' ? null : note.trim(),
-      });
+      await saveMaskVersion({ problemId, sessionId: detail?.sessionId ?? null, mask: maskData, width: maskSize.width, height: maskSize.height, method: 'manual-edit', seedColor: null, confidence: null });
+      showToast('Mask saved');
+      setEditingMask(false);
+      void loadDetail();
     } finally {
-      setSaving(false);
+      setSavingMask(false);
     }
   };
 
-  if (!detail) {
-    return null;
-  }
+  if (loading) return <div className="app-shell"><Skeleton variant="image" /><Skeleton variant="card" /></div>;
+  if (!detail) return null;
 
   return (
-    <div className="app-shell">
-      <header className="nav">
-        <div className="brand">
-          <div className="brand-mark">
-            <Sparkle />
-          </div>
-          <div>
-            <div className="brand-title">Problem</div>
-            <p className="brand-subtitle">{detail.sessionId ?? 'Session'}</p>
-          </div>
-        </div>
-        <div className="nav-actions">
-          <Button variant="ghost" onClick={() => navigate(-1)}>
-            Back
-          </Button>
-          <DoodleWave />
-        </div>
+    <div className="app-shell" style={{ gap: 'var(--space-5)' }}>
+      {/* Header */}
+      <header className="top-bar">
+        <Button variant="ghost" onClick={() => navigate(detail.sessionId ? `/session/${detail.sessionId}` : '/')}>←</Button>
+        <Segmented
+          options={[{ value: 'photo', label: 'Photo' }, { value: 'mask', label: 'Mask' }]}
+          value={view}
+          onChange={setView}
+        />
       </header>
 
-      <section className="detail-grid">
-        <Card className="reveal">
-          <div className="photo-frame" style={{ height: 360 }}>
-            {detail.imageUrl ? <img src={detail.imageUrl} alt="Problem" /> : null}
-            {maskView === 'mask' && detail.maskUrl ? (
-              <img className="mask-overlay" src={detail.maskUrl} alt="Mask overlay" />
-            ) : null}
-          </div>
-          <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            <Badge
-              label={`Mask: ${getMaskConfidenceLabel(detail.maskConfidence)}`}
-              variant="brand"
-            />
-            {detail.maskMethod ? (
-              <Badge label={`Method: ${detail.maskMethod}`} variant="neutral" />
-            ) : null}
-            {detail.maskUrl ? (
-              <Badge label="Mask ready" variant="brand" />
-            ) : (
-              <Badge label="Mask pending" variant="warning" />
-            )}
-          </div>
-          <div style={{ marginTop: '16px' }}>
-            <Segmented options={[...MASK_VIEW_OPTIONS]} value={maskView} onChange={setMaskView} />
-          </div>
-          <div className="footer-actions" style={{ marginTop: '16px' }}>
-            <Button variant="secondary" onClick={() => navigate(`/problem/${problemId}/mask`)}>
-              Edit mask
-            </Button>
-            <Button variant="ghost" onClick={() => navigate(-1)}>
-              Back to session
-            </Button>
-          </div>
-        </Card>
-
-        <Card className="reveal">
-          <div className="section-kicker">Outcome</div>
-          <h2 className="section-title">Log the climb</h2>
-          <p className="muted">Keep it light. Tap an outcome, add attempts if you want, move on.</p>
-          <Segmented
-            options={OUTCOME_OPTIONS.map((option) => ({
-              label: option.label,
-              value: option.value,
-            }))}
-            value={outcome}
-            onChange={setOutcome}
+      {/* Full-width image */}
+      <div style={{ position: 'relative', borderRadius: 'var(--radius-xl)', overflow: 'hidden', background: 'var(--bg-secondary)' }}>
+        {detail.imageUrl && (
+          <img src={detail.imageUrl} alt="Problem" style={{ width: '100%', display: 'block' }} />
+        )}
+        {view === 'mask' && detail.maskUrl && !editingMask && (
+          <img src={detail.maskUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', opacity: 0.7 }} />
+        )}
+        {editingMask && (
+          <canvas
+            ref={canvasRef}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none', cursor: brushMode === 'add' ? 'crosshair' : 'cell' }}
+            onPointerDown={(e) => { setIsDrawing(true); paintAt(e.clientX, e.clientY); }}
+            onPointerMove={(e) => isDrawing && paintAt(e.clientX, e.clientY)}
+            onPointerUp={() => setIsDrawing(false)}
+            onPointerLeave={() => setIsDrawing(false)}
           />
-          <div className="grid two" style={{ marginTop: '16px' }}>
-            <div>
-              <label className="muted" htmlFor="attempts-input">
-                Attempts
-              </label>
-              <Input
-                id="attempts-input"
-                type="number"
-                placeholder="e.g. 3"
-                value={attempts}
-                onChange={(event) => setAttempts(event.target.value)}
-              />
-            </div>
-            <div>
-              <div className="muted">Grade range</div>
-              <div className="grid" style={{ gap: '8px' }}>
-                <div>
-                  <label className="muted" htmlFor="grade-min-input">
-                    Min
-                  </label>
-                  <Input
-                    id="grade-min-input"
-                    type="number"
-                    placeholder="Min"
-                    value={gradeMin}
-                    onChange={(event) => setGradeMin(event.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="muted" htmlFor="grade-max-input">
-                    Max
-                  </label>
-                  <Input
-                    id="grade-max-input"
-                    type="number"
-                    placeholder="Max"
-                    value={gradeMax}
-                    onChange={(event) => setGradeMax(event.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
+        )}
+      </div>
+
+      {/* Mask tools */}
+      {editingMask ? (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)', padding: 'var(--space-3)', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <Button variant={brushMode === 'add' ? 'primary' : 'secondary'} onClick={() => setBrushMode('add')}>+</Button>
+            <Button variant={brushMode === 'erase' ? 'primary' : 'secondary'} onClick={() => setBrushMode('erase')}>−</Button>
+            {(['S', 'M', 'L'] as const).map((s) => (
+              <button key={s} type="button" onClick={() => setBrushSize(s)} style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: brushSize === s ? 'var(--accent-primary)' : 'var(--surface-bright)', color: brushSize === s ? 'white' : 'var(--text-muted)', fontWeight: 600, fontSize: 11, cursor: 'pointer' }}>{s}</button>
+            ))}
           </div>
-          <div style={{ marginTop: '16px' }}>
-            <label className="muted" htmlFor="note-input">
-              Note
-            </label>
-            <Textarea
-              id="note-input"
-              placeholder="Optional note"
-              rows={4}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <Button variant="ghost" onClick={() => void handleAutoMask()}>Auto</Button>
+            <Button variant="ghost" onClick={() => setEditingMask(false)}>Cancel</Button>
+            <Button variant="primary" onClick={() => void handleSaveMask()} disabled={savingMask}>{savingMask ? '...' : 'Save'}</Button>
           </div>
-          <div className="footer-actions" style={{ marginTop: '16px' }}>
-            <Button variant="primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save log'}
-            </Button>
-            <Badge label="One tap flow" variant="brand" />
-          </div>
-          <div style={{ marginTop: '16px' }}>
-            <DoodleArrow />
-          </div>
-        </Card>
-      </section>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 'var(--space-2)', alignSelf: 'flex-start' }}>
+          <Button
+            variant="primary"
+            onClick={() => problemId && navigate(`/problem/${problemId}/mask`)}
+          >
+            Mask editor
+          </Button>
+          <Button variant="secondary" onClick={() => setEditingMask(true)}>
+            Quick edit
+          </Button>
+        </div>
+      )}
+
+      {/* Outcome */}
+      <div>
+        <div className="text-sm muted" style={{ marginBottom: 'var(--space-2)' }}>Outcome</div>
+        <OutcomeChips value={outcome} onChange={setOutcome} />
+      </div>
+
+      {/* Grade */}
+      <div>
+        <div className="text-sm muted" style={{ marginBottom: 'var(--space-2)' }}>Grade</div>
+        <GradeSelector value={grade} onChange={setGrade} />
+      </div>
+
+      {/* Attempts & Notes inline */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-4)' }}>
+        <div>
+          <label className="text-sm muted">Attempts</label>
+          <Input type="number" placeholder="#" value={attempts} onChange={(e) => setAttempts(e.target.value)} style={{ marginTop: 'var(--space-2)' }} />
+        </div>
+        <div>
+          <label className="text-sm muted">Notes</label>
+          <Textarea placeholder="Beta, conditions..." rows={2} value={note} onChange={(e) => setNote(e.target.value)} style={{ marginTop: 'var(--space-2)' }} />
+        </div>
+      </div>
+
+      <Toast message={toastMessage} visible={toastVisible} />
     </div>
   );
 }

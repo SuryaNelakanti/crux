@@ -6,6 +6,7 @@ const MASK_TINT = { r: 47, g: 191, b: 156, a: 235 };
 export async function generateMaskFromPhoto(params: {
   uri: string;
   seedColor?: HSL;
+  seedPoint?: { x: number; y: number };
   maxWidth?: number;
 }): Promise<{
   mask: Uint8Array;
@@ -24,6 +25,7 @@ export async function generateMaskFromPhoto(params: {
     width,
     height,
     seedColor: params.seedColor,
+    seedPoint: params.seedPoint,
   });
   return {
     mask: result.mask,

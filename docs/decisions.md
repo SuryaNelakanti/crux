@@ -230,7 +230,7 @@ Introduce top-level folders for:
 
 **Date:** 2026-01-18
 
-**Status:** Accepted
+**Status:** Superseded (see ADR-013)
 
 **Context:**
 Auto mask works for most photos, but when hold color is off, users had no quick
@@ -238,9 +238,9 @@ way to re-run the mask without brushing everything. The mask overlay was also
 too subtle to read on the photo.
 
 **Decision:**
-Add a `Pick hold color` action in the web mask editor that samples a pixel and
-re-runs the auto mask with a seed color. Increase overlay visibility with a
-stronger tint and normal blend mode.
+Remove the pick-color re-mask UI in favor of tap-to-route hold selection. Keep
+seeded masking logic available for future use, while improving overlay visibility
+with a stronger tint and normal blend mode.
 
 **Consequences:**
 - Users can re-mask quickly without full manual edits
@@ -249,7 +249,7 @@ stronger tint and normal blend mode.
 
 ---
 
-## ADR-011: Cover-aware mask editing + seeded clustering
+## ADR-011: Contain-aware mask editing + seeded clustering
 
 **Date:** 2026-01-18
 
@@ -261,12 +261,83 @@ without mapping pointer coordinates to the cropped region. Seeded masks also fel
 inconsistent when the selected color didn't align with cluster centers.
 
 **Decision:**
-Render the editor overlay with a cover transform and map pointer coordinates
-through the same transform. When a seed color is provided, still compute clusters
-and choose the nearest cluster center, with adaptive thresholds and smaller
-component filtering for better hold capture.
+Render the editor overlay with a contain transform so the full photo is visible,
+and map pointer coordinates through the same transform. When a seed color is
+provided, still compute clusters and choose the nearest cluster center, with
+adaptive thresholds and smaller component filtering for better hold capture.
 
 **Consequences:**
-- Edits align with the preview and saved mask positions
+- Edits align with the preview and saved mask positions without cropping
 - Seeded masks are more stable on real photos
 - Slightly more CPU during mask generation and redraw
+
+---
+
+## ADR-012: Seeded LAB region-grow for pastel holds
+
+**Date:** 2026-01-18
+
+**Status:** Accepted
+
+**Context:**
+Pastel holds (pink/yellow) were difficult to capture with HSL-only thresholds.
+Users saw masks collapse or drift to nearby wall colors even with seed selection.
+
+**Decision:**
+When a seed point is provided, compute LAB distance from the sampled seed pixel
+and grow the mask regionally from the seed. Use adaptive thresholds by hue/
+lightness, a low-saturation wall guard, and a coverage sanity retry.
+
+**Consequences:**
+- Seeded masks better lock onto pastel holds
+- Color selection is more robust with minor lighting changes
+- Slightly higher CPU cost during seeded masking
+
+---
+
+## ADR-013: Hold outline + tap-to-route (non-ML MVP)
+
+**Date:** 2026-01-18
+
+**Status:** Accepted
+
+**Context:**
+Users expect the mask editor to outline all holds and allow a single tap to
+select the full route (all holds of the same color). ML solutions are heavier
+than needed for the MVP.
+
+**Decision:**
+Implement a non-ML hold detection pipeline (color clustering + connected
+components) that outlines all holds with outline-only rendering for clarity.
+Tapping a hold selects the route by color cluster and generates the route mask
+for saving; brush edits remain available for corrections.
+
+**Consequences:**
+- Faster UX for route selection without manual brushing
+- Deterministic, offline-friendly pipeline
+- Some false positives in noisy images (acceptable for MVP)
+
+---
+
+## ADR-014: Atlas Design System with Organic Doodles
+
+**Date:** 2026-01-18
+
+**Status:** Accepted
+
+**Context:**
+The initial UI feedback highlighted a need for a more premium, structured aesthetic ("Atlas") combined with a "human journal" feel.
+Standard clean UIs felt too generic, while heavy gamified designs felt childish.
+
+**Decision:**
+Adopt the "Atlas" design language:
+- **Warm Technical Base**: Sand/Stone backgrounds, Sage/Teal accents (No Orange/Blue primary).
+- **Typography:** `Playfair Display` (Serif) for headers + `Space Mono` for data.
+- **Layout:** Grid-based technical layouts with corner brackets, crosshairs, and data-dense headers.
+- **Organic Layer:** Overlay distinct hand-drawn SVG doodles (spirals, stars, scribbles) that animate in ("draw themselves") to humanize the technical grid.
+
+**Consequences:**
+- Distinctive, premium "Field Lab" brand identity
+- Clear separation between structure (Grid) and human input (Doodles)
+- Requires maintenance of dual-layer visual system (Tech + Organic)
+- Typography choices (Serif + Mono) require careful font loading

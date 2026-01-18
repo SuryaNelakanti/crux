@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DoodleArrow, DoodleWave, Sparkle } from '@/components/Doodle';
-import { Badge, Button, Card, StatChip } from '@/components/ui';
+import { FAB } from '@/components/FAB';
+import { Skeleton } from '@/components/Skeleton';
+import { Badge, Button } from '@/components/ui';
 import { createProblemFromUpload, createSession, fetchSessions } from '@/lib/api';
 import { getSupabaseClient } from '@/lib/supabase';
 
@@ -27,12 +28,7 @@ export function SessionsRoute() {
     void load();
   }, [load]);
 
-  const handleStart = async () => {
-    const sessionId = await createSession();
-    navigate(`/session/${sessionId}`);
-  };
-
-  const handleQuickCapture = () => {
+  const handleCapture = () => {
     fileRef.current?.click();
   };
 
@@ -59,120 +55,125 @@ export function SessionsRoute() {
     await client.auth.signOut();
   };
 
-  const latestSession = sessions[0] ?? null;
-  const liveCount = sessions.filter((session) => !session.endTs).length;
+  const totalProblems = sessions.reduce((sum, s) => sum + s.problemCount, 0);
 
   return (
     <div className="app-shell">
-      <header className="nav">
-        <div className="brand">
-          <div className="brand-mark">
-            <Sparkle />
-          </div>
-          <div>
-            <div className="brand-title">Crux</div>
-            <p className="brand-subtitle">Photo-first bouldering journal</p>
-          </div>
+      {/* Header - Atlas Style */}
+      <header className="top-bar">
+        <div className="top-bar-brand">
+          <div className="brand-mark">▲</div> {/* Atlas-like Triangle symbol */}
+          <span className="serif" style={{ fontSize: '1.25rem' }}>Crux Journal</span>
         </div>
-        <div className="nav-actions">
-          <Button variant="ghost" onClick={handleSignOut}>
-            Sign out
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <Button variant="secondary" onClick={handleSignOut}>
+            LOG_OUT
           </Button>
-          <DoodleWave />
         </div>
       </header>
 
-      <section className="hero-grid">
-        <Card className="reveal">
-          <div className="section-kicker">Today</div>
-          <h2 className="section-title">Start a live session</h2>
-          <p className="muted">Capture problems fast. Auto-mask the holds. Log in a few taps.</p>
-          <div className="footer-actions">
-            <Button variant="primary" onClick={handleStart}>
-              Start Session
-            </Button>
-            <Button variant="secondary" onClick={handleQuickCapture} disabled={uploading}>
-              {uploading ? 'Uploading...' : 'Quick capture'}
-            </Button>
-            <Badge label={`${liveCount} live`} variant="brand" />
-          </div>
-          {error ? <Badge label={error} variant="warning" /> : null}
-          <div style={{ marginTop: '14px' }}>
-            <DoodleArrow />
-          </div>
-        </Card>
-
-        <Card className="card-ink reveal">
-          <div className="section-kicker">Pulse</div>
-          <h2 className="section-title">Recent energy</h2>
-          {latestSession ? (
-            <div className="grid" style={{ gap: '12px' }}>
-              <div>
-                <div style={{ fontSize: '22px', fontWeight: 600 }}>
-                  {latestSession.startTs.toLocaleDateString()}
-                </div>
-                <div style={{ color: 'rgba(248, 250, 252, 0.7)', fontSize: '13px' }}>
-                  {latestSession.endTs ? 'Ended' : 'Live'} session
-                </div>
-              </div>
-              <div className="pill-group">
-                <StatChip label="Problems" value={latestSession.problemCount} />
-                <StatChip label="Sends" value={latestSession.sendCount} />
-                <StatChip label="Flashes" value={latestSession.flashCount} />
-              </div>
-              <Badge label="Auto mask + brush edits" variant="brand" />
-            </div>
-          ) : (
-            <p style={{ color: 'rgba(248, 250, 252, 0.7)' }}>
-              Your session pulse will show here once you log a climb.
-            </p>
-          )}
-        </Card>
-      </section>
-
-      <div>
-        <div className="section-kicker">Archive</div>
-        <h2 className="section-title">Recent sessions</h2>
-        {loading ? (
-          <Card className="card-soft">
-            <p className="muted">Loading sessions...</p>
-          </Card>
-        ) : sessions.length === 0 ? (
-          <Card className="card-soft">
-            <p className="muted">No sessions yet. Start your first climb.</p>
-          </Card>
-        ) : (
-          <div className="gallery">
-            {sessions.map((session) => (
-              <Card key={session.id} className="reveal">
-                <div
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                  <div>
-                    <div className="problem-title">{session.startTs.toLocaleDateString()}</div>
-                    <div className="problem-subtitle">
-                      {session.endTs ? 'Ended' : 'Live'} session
-                    </div>
-                  </div>
-                  <Button variant="secondary" onClick={() => navigate(`/session/${session.id}`)}>
-                    Open
-                  </Button>
-                </div>
-                <div className="pill-group" style={{ marginTop: '12px' }}>
-                  <StatChip label="Problems" value={session.problemCount} />
-                  <StatChip label="Sends" value={session.sendCount} />
-                  <StatChip label="Flashes" value={session.flashCount} />
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
+      {/* Technical Status Block */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '1px',
+        background: 'var(--border-default)',
+        border: '1px solid var(--border-default)',
+        marginBottom: 'var(--space-4)'
+      }}>
+        <div style={{ background: 'var(--bg-primary)', padding: 'var(--space-4)' }}>
+          <div className="mono" style={{ color: 'var(--text-muted)' }}>TOTAL_ENTRIES</div>
+          <div className="serif" style={{ fontSize: '2rem' }}>{totalProblems}</div>
+        </div>
+        <div style={{ background: 'var(--bg-primary)', padding: 'var(--space-4)' }}>
+          <div className="mono" style={{ color: 'var(--text-muted)' }}>ACTIVE_SESSIONS</div>
+          <div className="serif" style={{ fontSize: '2rem' }}>{sessions.length}</div>
+        </div>
       </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 className="mono" style={{ fontSize: '0.8rem' }}>// RECENT_LOGS</h2>
+        <Button variant="primary" onClick={handleCapture} disabled={uploading}>
+          {uploading ? 'UPLOADING...' : '+ NEW_ENTRY'}
+        </Button>
+      </div>
+
+      {error && <Badge label={error} variant="warning" />}
+
+      {/* Sessions List */}
+      {loading ? (
+        <div className="grid">
+          <Skeleton variant="card" />
+          <Skeleton variant="card" />
+        </div>
+      ) : sessions.length === 0 ? (
+        <button
+          type="button"
+          onClick={handleCapture}
+          style={{
+            width: '100%',
+            padding: 'var(--space-8)',
+            background: 'var(--bg-secondary)',
+            border: '1px dashed var(--border-strong)',
+            cursor: 'pointer',
+            textAlign: 'center'
+          }}
+        >
+          <div className="serif" style={{ fontSize: '1.5rem', marginBottom: 'var(--space-2)' }}>No Data Found</div>
+          <div className="mono">INITIATE_FIRST_CAPTURE_SEQUENCE</div>
+        </button>
+      ) : (
+        <div className="grid">
+          {sessions.map((session, i) => (
+            <button
+              key={session.id}
+              type="button"
+              onClick={() => navigate(`/session/${session.id}`)}
+              className="card reveal"
+              style={{
+                animationDelay: `${i * 100}ms`,
+                textAlign: 'left',
+                display: 'flex',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                width: '100%',
+                alignItems: 'center'
+              }}
+            >
+              <div>
+                <div className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                  ID: {session.id.split('-')[0].toUpperCase()}
+                </div>
+                <div className="serif" style={{ fontSize: '1.25rem' }}>
+                  {session.startTs.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                </div>
+                <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                  <span className="mono" style={{ fontSize: '0.75rem' }}>PROBS: {session.problemCount}</span>
+                  <span className="mono" style={{ fontSize: '0.75rem' }}>SENDS: {session.sendCount}</span>
+                </div>
+              </div>
+
+              <div style={{
+                width: '32px', height: '32px',
+                border: '1px solid var(--border-strong)',
+                display: 'grid', placeItems: 'center',
+                color: 'var(--text-secondary)'
+              }}>
+                →
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* FAB - Adjusted for tech feel */}
+      <FAB onClick={handleCapture} aria-busy={uploading} />
 
       <input
         ref={fileRef}
         type="file"
         accept="image/*"
+        capture="environment"
         onChange={handleFile}
         style={{ display: 'none' }}
       />

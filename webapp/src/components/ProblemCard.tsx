@@ -8,6 +8,7 @@ export function ProblemCard({
   outcome,
   gradeLabel,
   onClick,
+  style,
 }: {
   title: string;
   subtitle: string;
@@ -16,46 +17,85 @@ export function ProblemCard({
   outcome: string | null;
   gradeLabel: string | null;
   onClick?: () => void;
+  style?: React.CSSProperties;
 }) {
   const isInteractive = Boolean(onClick);
-
-  const handleClick = () => {
-    if (!isInteractive) return;
-    onClick?.();
-  };
 
   return (
     <button
       type="button"
-      className={`card problem-card${onClick ? ' clickable' : ''}`}
-      onClick={handleClick}
+      className={`card problem-card${onClick ? ' clickable' : ''} reveal`}
+      onClick={onClick}
       disabled={!isInteractive}
       aria-disabled={!isInteractive}
+      style={{
+        padding: 0,
+        overflow: 'hidden',
+        textAlign: 'left',
+        display: 'flex',
+        flexDirection: 'column',
+        ...style,
+      }}
     >
-      <div className="photo-frame problem-media">
-        {imageUrl ? <img src={imageUrl} alt="Problem" /> : null}
-        {maskUrl ? <img className="mask-overlay" src={maskUrl} alt="Mask" /> : null}
+      {/* Photo */}
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          paddingTop: '75%', /* 4:3 aspect ratio */
+          background: 'var(--ink-900)',
+          borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
+          overflow: 'hidden',
+        }}
+      >
+        {imageUrl && (
+          <img
+            src={imageUrl}
+            alt="Problem"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+        )}
+        {maskUrl && (
+          <img
+            className="mask-overlay"
+            src={maskUrl}
+            alt="Mask"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              opacity: 0.7,
+            }}
+          />
+        )}
       </div>
-      <div className="problem-meta">
-        <div className="problem-header">
+
+      {/* Meta */}
+      <div style={{ padding: 'var(--space-4)', flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
           <div>
-            <div className="problem-title">{title}</div>
-            <div className="problem-subtitle">{subtitle}</div>
+            <div style={{ fontWeight: 600 }}>{title}</div>
+            <div className="muted text-sm">{subtitle}</div>
           </div>
           {outcome ? (
             <Badge label={outcome} variant="brand" />
           ) : (
-            <Badge label="Unlogged" variant="neutral" />
+            <Badge label="Log it" variant="neutral" />
           )}
         </div>
-        <div className="pill-group">
-          {gradeLabel ? <Badge label={gradeLabel} variant="neutral" /> : null}
-          {maskUrl ? (
-            <Badge label="Mask ready" variant="brand" />
-          ) : (
-            <Badge label="Mask pending" variant="warning" />
-          )}
-        </div>
+        {gradeLabel && (
+          <div style={{ marginTop: 'var(--space-2)' }}>
+            <Badge label={gradeLabel} variant="neutral" />
+          </div>
+        )}
       </div>
     </button>
   );

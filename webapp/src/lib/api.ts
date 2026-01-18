@@ -9,6 +9,7 @@ import { type HSL } from '@crux/vision';
 import { insertEvents, uploadMask, uploadPhoto } from '@crux/supabase-client';
 import { preparePhotoForUpload } from './image';
 import { buildMaskRgba, generateMaskFromPhoto, rgbaToBlob } from './mask';
+import { buildRouteMaskForCluster, detectHoldsFromPhoto, pickBestCluster } from './holds';
 import { getSupabaseClient } from './supabase';
 
 export interface SessionSummary {
@@ -113,7 +114,30 @@ const buildEvent = (params: Omit<AppEvent, 'id' | 'clientTs' | 'serverTs'>): App
   ...params,
 });
 
-export async function getAuthUser() {
+const countMask = (mask: Uint8Array): number => {
+  let hits = 0;
+  for (let i = 0; i < mask.length; i += 1) {
+    if (mask[i]) hits += 1;
+  }
+  return hits;
+};
+
+const computeRouteConfidence = (mask: Uint8Array, holdScores: number[]): number => {
+  if (mask.length === 0) return 0;
+  const coverage = countMask(mask) / mask.length;
+  const coverageScore =
+    coverage < 0.005 || coverage > 0.5 ? 0 : 1 - Math.abs(coverage - 0.12) / 0.38;
+  const avgHoldScore =
+    holdScores.length === 0 ? 0 : holdScores.reduce((sum, score) => sum + score, 0) / holdScores.length;
+  return Math.min(1, Math.max(0, avgHoldScore * 0.7 + coverageScore * 0.3));
+};
+
+interface AuthUser {
+  id: string;
+  email?: string;
+}
+
+export async function getAuthUser(): Promise<AuthUser | null> {
   const client = getSupabaseClient();
   console.log('[getAuthUser] Calling client.auth.getUser()...');
   const timeoutPromise = new Promise<never>((_, reject) =>
@@ -121,7 +145,7 @@ export async function getAuthUser() {
   );
   try {
     const result = await Promise.race([client.auth.getUser(), timeoutPromise]);
-    const { data, error } = result as { data: { user: unknown }; error: unknown };
+    const { data, error } = result as { data: { user: AuthUser | null }; error: unknown };
     console.log('[getAuthUser] Result:', { user: data.user, error });
     if (error) throw new Error(String(error));
     return data.user;
@@ -347,12 +371,12 @@ export async function fetchProblemDetail(problemId: string): Promise<ProblemDeta
     maskMethod: mask?.method ?? null,
     log: log
       ? {
-          outcome: log.outcome,
-          attemptsCount: log.attempts_count,
-          gradeMin: log.grade_min,
-          gradeMax: log.grade_max,
-          note: log.note,
-        }
+        outcome: log.outcome,
+        attemptsCount: log.attempts_count,
+        gradeMin: log.grade_min,
+        gradeMax: log.grade_max,
+        note: log.note,
+      }
       : null,
     media: {
       width: photo?.width ?? null,
@@ -437,9 +461,29 @@ export async function createProblemFromUpload(params: {
     }),
   ]);
 
-  const maskResult = await generateMaskFromPhoto({ uri: processed.processing.uri });
-  const maskRgba = buildMaskRgba(maskResult.mask, maskResult.width, maskResult.height);
-  const maskBlob = await rgbaToBlob(maskRgba, maskResult.width, maskResult.height);
+  const detection = await detectHoldsFromPhoto({
+    uri: processed.processing.uri,
+    maxWidth: processed.processing.width,
+  });
+  const bestCluster = pickBestCluster(detection);
+  let routeMask = buildRouteMaskForCluster(detection, bestCluster);
+  let maskMethod: 'auto' | 'seed-color' | 'manual-edit' = 'auto';
+  let maskConfidence = computeRouteConfidence(
+    routeMask,
+    detection.holds
+      .filter((hold) => (bestCluster === null ? false : hold.clusterIndex === bestCluster))
+      .map((hold) => hold.score)
+  );
+
+  if (routeMask.length === 0 || countMask(routeMask) === 0) {
+    const fallback = await generateMaskFromPhoto({ uri: processed.processing.uri });
+    routeMask = fallback.mask;
+    maskMethod = fallback.method;
+    maskConfidence = fallback.confidence;
+  }
+
+  const maskRgba = buildMaskRgba(routeMask, detection.width, detection.height);
+  const maskBlob = await rgbaToBlob(maskRgba, detection.width, detection.height);
   const maskMediaId = generateId();
   const maskUpload = await uploadMask(problemId, maskMediaId, maskBlob);
 
@@ -448,8 +492,8 @@ export async function createProblemFromUpload(params: {
     problem_id: problemId,
     type: 'mask',
     storage_path: maskUpload.path,
-    width: maskResult.width,
-    height: maskResult.height,
+    width: detection.width,
+    height: detection.height,
     created_at: now.toISOString(),
     sha256: null,
     bytes: maskBlob.size,
@@ -463,9 +507,9 @@ export async function createProblemFromUpload(params: {
     problem_id: problemId,
     version: 1,
     mask_media_id: maskMediaId,
-    method: maskResult.method,
-    seed_color_json: maskResult.seedColor,
-    confidence: maskResult.confidence,
+    method: maskMethod,
+    seed_color_json: null,
+    confidence: maskConfidence,
     created_by: user.id,
     created_at: now.toISOString(),
   });
@@ -487,8 +531,8 @@ export async function createProblemFromUpload(params: {
       payloadJson: {
         problemId,
         routeMaskId,
-        method: maskResult.method,
-        confidence: maskResult.confidence,
+        method: maskMethod,
+        confidence: maskConfidence,
       },
     }),
   ]);

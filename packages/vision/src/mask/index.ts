@@ -7,7 +7,7 @@
  * Takes pixel data, returns mask data.
  */
 
-import { type HSL, type RGB, rgbToHsl } from '../color';
+import { type HSL, type LAB, type RGB, hslToRgb, rgbToHsl, rgbToLab } from '../color';
 
 const DEFAULT_K = 5;
 const MAX_SAMPLE_PIXELS = 15000;
@@ -29,6 +29,60 @@ const hslDistance = (a: HSL, b: HSL): number => {
     (hue * HUE_WEIGHT) ** 2 + (sat * SAT_WEIGHT) ** 2 + (light * LIGHT_WEIGHT) ** 2
   );
 };
+
+const labDistance = (a: LAB, b: LAB): number =>
+  Math.sqrt((a.l - b.l) ** 2 + (a.a - b.a) ** 2 + (a.b - b.b) ** 2);
+
+const getRgbAt = (pixels: Uint8ClampedArray, idx: number): RGB => ({
+  r: pixels[idx],
+  g: pixels[idx + 1],
+  b: pixels[idx + 2],
+});
+
+const sampleSeedLab = (
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  seedPoint: { x: number; y: number },
+  window: number = 2
+): LAB => {
+  let sumR = 0;
+  let sumG = 0;
+  let sumB = 0;
+  let count = 0;
+  const startX = Math.max(0, seedPoint.x - window);
+  const endX = Math.min(width - 1, seedPoint.x + window);
+  const startY = Math.max(0, seedPoint.y - window);
+  const endY = Math.min(height - 1, seedPoint.y + window);
+  for (let y = startY; y <= endY; y += 1) {
+    for (let x = startX; x <= endX; x += 1) {
+      const offset = (y * width + x) * 4;
+      sumR += pixels[offset];
+      sumG += pixels[offset + 1];
+      sumB += pixels[offset + 2];
+      count += 1;
+    }
+  }
+  const rgb: RGB = {
+    r: count ? Math.round(sumR / count) : pixels[(seedPoint.y * width + seedPoint.x) * 4],
+    g: count
+      ? Math.round(sumG / count)
+      : pixels[(seedPoint.y * width + seedPoint.x) * 4 + 1],
+    b: count
+      ? Math.round(sumB / count)
+      : pixels[(seedPoint.y * width + seedPoint.x) * 4 + 2],
+  };
+  return rgbToLab(rgb);
+};
+
+const clampPoint = (
+  point: { x: number; y: number },
+  width: number,
+  height: number
+): { x: number; y: number } => ({
+  x: Math.min(width - 1, Math.max(0, Math.round(point.x))),
+  y: Math.min(height - 1, Math.max(0, Math.round(point.y))),
+});
 
 const toHueVector = (h: number): { sin: number; cos: number } => {
   const rad = (h * Math.PI) / 180;
@@ -85,6 +139,8 @@ export interface MaskGenerationInput {
   height: number;
   /** Optional seed color (from user tap) */
   seedColor?: HSL;
+  /** Optional seed point (pixel coordinates matching the input size) */
+  seedPoint?: { x: number; y: number };
 }
 
 export interface ColorCluster {
@@ -111,6 +167,87 @@ export interface MaskGenerationResult {
   clusters: ColorCluster[];
 }
 
+const buildSeededMask = (params: {
+  pixels: Uint8ClampedArray;
+  width: number;
+  height: number;
+  seedPoint: { x: number; y: number };
+  seedLab: LAB;
+  seedHsl: HSL;
+  hslThreshold: number;
+  labThreshold: number;
+  saturationFloor: number;
+  wallClusterCenter?: HSL;
+  maxRadius: number;
+}): Uint8Array => {
+  const {
+    pixels,
+    width,
+    height,
+    seedPoint,
+    seedLab,
+    seedHsl,
+    hslThreshold,
+    labThreshold,
+    saturationFloor,
+    wallClusterCenter,
+    maxRadius,
+  } = params;
+  const mask = new Uint8Array(width * height);
+  const visited = new Uint8Array(mask.length);
+  const stack: number[] = [];
+  const seedIdx = seedPoint.y * width + seedPoint.x;
+  stack.push(seedIdx);
+  visited[seedIdx] = 1;
+  mask[seedIdx] = 1;
+  const maxRadiusSq = maxRadius * maxRadius;
+
+  while (stack.length) {
+    const idx = stack.pop() ?? 0;
+    const x = idx % width;
+    const y = Math.floor(idx / width);
+    const dx = x - seedPoint.x;
+    const dy = y - seedPoint.y;
+    if (dx * dx + dy * dy > maxRadiusSq) continue;
+    const offset = idx * 4;
+    const rgb = getRgbAt(pixels, offset);
+    const hsl = rgbToHsl(rgb);
+    if (saturationFloor && hsl.s < saturationFloor) continue;
+    if (wallClusterCenter && hslDistance(hsl, wallClusterCenter) < hslDistance(hsl, seedHsl) * 0.9) {
+      continue;
+    }
+    const lab = rgbToLab(rgb);
+    const labDist = labDistance(lab, seedLab);
+    const hslDist = hslDistance(hsl, seedHsl);
+    if (labDist <= labThreshold && hslDist <= hslThreshold) {
+      mask[idx] = 1;
+      const neighbors = [
+        [x - 1, y],
+        [x + 1, y],
+        [x, y - 1],
+        [x, y + 1],
+      ];
+      for (const [nx, ny] of neighbors) {
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        const nidx = ny * width + nx;
+        if (visited[nidx]) continue;
+        visited[nidx] = 1;
+        stack.push(nidx);
+      }
+    }
+  }
+
+  return mask;
+};
+
+const countMask = (mask: Uint8Array): number => {
+  let hits = 0;
+  for (let i = 0; i < mask.length; i += 1) {
+    if (mask[i]) hits += 1;
+  }
+  return hits;
+};
+
 // ============================================================================
 // Pipeline Functions (Stubs)
 // ============================================================================
@@ -128,7 +265,7 @@ export interface MaskGenerationResult {
  * 7. Calculate confidence
  */
 export function generateMask(input: MaskGenerationInput): MaskGenerationResult {
-  const { width, height, seedColor } = input;
+  const { width, height, seedColor, seedPoint } = input;
   const mask = new Uint8Array(width * height);
 
   if (width === 0 || height === 0) {
@@ -180,18 +317,76 @@ export function generateMask(input: MaskGenerationInput): MaskGenerationResult {
   const saturationFloor =
     seedColor && seedColor.s > 35 ? Math.min(22, Math.round(seedColor.s - 35)) : 0;
 
-  for (let i = 0; i < width * height; i += 1) {
-    const offset = i * 4;
-    const rgb: RGB = {
-      r: input.pixels[offset],
-      g: input.pixels[offset + 1],
-      b: input.pixels[offset + 2],
-    };
-    const hsl = rgbToHsl(rgb);
-    if (saturationFloor && hsl.s < saturationFloor) continue;
-    const distance = hslDistance(hsl, selectedSeed);
-    if (distance <= threshold) {
-      mask[i] = 1;
+  const wallCluster = clusters
+    .filter((cluster) => cluster.avgSaturation < 20)
+    .sort((a, b) => b.count - a.count)[0];
+
+  const useSeedGrow = Boolean(seedColor && seedPoint);
+
+  if (useSeedGrow && seedPoint) {
+    const clampedSeed = clampPoint(seedPoint, width, height);
+    const seedLab =
+      seedPoint !== undefined
+        ? sampleSeedLab(input.pixels, width, height, clampedSeed, 2)
+        : rgbToLab(hslToRgb(selectedSeed));
+    const seedHsl = seedColor ?? selectedSeed;
+
+    const hueBoost =
+      (seedHsl.h >= 35 && seedHsl.h <= 90) || (seedHsl.h >= 300 || seedHsl.h <= 20) ? 4 : 0;
+    const pastelBoost = seedHsl.s < 35 ? 8 : 0;
+    const lightBoost = seedHsl.l > 70 ? 6 : 0;
+    const baseLab = 18 + pastelBoost + lightBoost + hueBoost;
+    const baseHsl = threshold * (seedHsl.s < 30 ? 1.25 : 1.1);
+
+    const maxRadius = Math.max(width, height) * 0.45;
+    let seededMask = buildSeededMask({
+      pixels: input.pixels,
+      width,
+      height,
+      seedPoint: clampedSeed,
+      seedLab,
+      seedHsl,
+      hslThreshold: baseHsl,
+      labThreshold: baseLab,
+      saturationFloor,
+      wallClusterCenter: wallCluster?.center,
+      maxRadius,
+    });
+
+    const total = width * height;
+    const coverage = total ? countMask(seededMask) / total : 0;
+    const minCoverage = 0.003;
+    const maxCoverage = 0.45;
+    if (coverage < minCoverage || coverage > maxCoverage) {
+      const scale = coverage < minCoverage ? 1.25 : 0.85;
+      seededMask = buildSeededMask({
+        pixels: input.pixels,
+        width,
+        height,
+        seedPoint: clampedSeed,
+        seedLab,
+        seedHsl,
+        hslThreshold: baseHsl * scale,
+        labThreshold: baseLab * scale,
+        saturationFloor: coverage > maxCoverage ? saturationFloor + 6 : saturationFloor,
+        wallClusterCenter: wallCluster?.center,
+        maxRadius,
+      });
+    }
+
+    for (let i = 0; i < mask.length; i += 1) {
+      mask[i] = seededMask[i];
+    }
+  } else {
+    for (let i = 0; i < width * height; i += 1) {
+      const offset = i * 4;
+      const rgb = getRgbAt(input.pixels, offset);
+      const hsl = rgbToHsl(rgb);
+      if (saturationFloor && hsl.s < saturationFloor) continue;
+      const distance = hslDistance(hsl, selectedSeed);
+      if (distance <= threshold) {
+        mask[i] = 1;
+      }
     }
   }
 

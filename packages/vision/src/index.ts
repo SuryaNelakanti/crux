@@ -35,3 +35,6 @@ export {
   type MaskGenerationResult,
   scoreCluster,
 } from './mask';
+
+// Hold detection
+export { detectHolds, type HoldCandidate, type HoldDetectionResult } from './holds';

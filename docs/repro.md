@@ -24,5 +24,5 @@
 3. Open the web app and sign in via magic link.
 4. Start a session and upload a photo.
 5. Confirm the problem appears with a mask overlay.
-6. Open the mask editor, use `Pick hold color` to re-run the mask, then brush edit and save a new mask version.
+6. Open the mask editor, tap a hold to auto-select the route, then brush edit and save a new mask version.
 7. Log outcome + attempts + grade range and save.

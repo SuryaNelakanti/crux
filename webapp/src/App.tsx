@@ -7,6 +7,7 @@ import { MaskEditorRoute } from '@/routes/MaskEditor';
 import { ProblemDetailRoute } from '@/routes/ProblemDetail';
 import { SessionDetailRoute } from '@/routes/SessionDetail';
 import { SessionsRoute } from '@/routes/Sessions';
+import { RandomDoodles } from '@/components/Doodle';
 
 export function App() {
   const [ready, setReady] = useState(false);
@@ -63,12 +64,17 @@ export function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<SessionsRoute />} />
-      <Route path="/session/:sessionId" element={<SessionDetailRoute />} />
-      <Route path="/problem/:problemId" element={<ProblemDetailRoute />} />
-      <Route path="/problem/:problemId/mask" element={<MaskEditorRoute />} />
-      <Route path="*" element={<SessionsRoute />} />
-    </Routes>
+    <>
+      <div className="doodle-layer">
+        <RandomDoodles />
+      </div>
+      <Routes>
+        <Route path="/" element={<SessionsRoute />} />
+        <Route path="/session/:sessionId" element={<SessionDetailRoute />} />
+        <Route path="/problem/:problemId" element={<ProblemDetailRoute />} />
+        <Route path="/problem/:problemId/mask" element={<MaskEditorRoute />} />
+        <Route path="*" element={<SessionsRoute />} />
+      </Routes>
+    </>
   );
 }

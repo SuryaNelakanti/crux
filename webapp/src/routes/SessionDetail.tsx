@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { DoodleArrow, DoodleWave, Sparkle } from '@/components/Doodle';
-import { ProblemCard } from '@/components/ProblemCard';
-import { Badge, Button, Card } from '@/components/ui';
+import { FAB } from '@/components/FAB';
+import { Skeleton } from '@/components/Skeleton';
+import { Badge, Button } from '@/components/ui';
 import {
   createProblemFromUpload,
   endSession,
@@ -17,8 +17,13 @@ export function SessionDetailRoute() {
   const [problems, setProblems] = useState<Awaited<ReturnType<typeof fetchProblemsForSession>>>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [sessionTitle, setSessionTitle] = useState<string>('Session');
-  const [sessionStatus, setSessionStatus] = useState<'Live' | 'Ended'>('Live');
+  const [sessionData, setSessionData] = useState<{
+    id: string;
+    title: string;
+    isLive: boolean;
+    problemCount: number;
+    sendCount: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -26,10 +31,15 @@ export function SessionDetailRoute() {
     setLoading(true);
     try {
       const sessions = await fetchSessions();
-      const session = sessions.find((entry) => entry.id === sessionId);
+      const session = sessions.find((s) => s.id === sessionId);
       if (session) {
-        setSessionTitle(session.startTs.toLocaleDateString());
-        setSessionStatus(session.endTs ? 'Ended' : 'Live');
+        setSessionData({
+          id: session.id,
+          title: session.startTs.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }),
+          isLive: !session.endTs,
+          problemCount: session.problemCount,
+          sendCount: session.sendCount,
+        });
       }
       const data = await fetchProblemsForSession(sessionId);
       setProblems(data);
@@ -42,9 +52,7 @@ export function SessionDetailRoute() {
     void load();
   }, [load]);
 
-  const handleUpload = () => {
-    fileRef.current?.click();
-  };
+  const handleCapture = () => fileRef.current?.click();
 
   const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!sessionId) return;
@@ -70,105 +78,150 @@ export function SessionDetailRoute() {
     void load();
   };
 
-  if (!sessionId) {
-    return null;
-  }
+  if (!sessionId) return null;
 
   return (
     <div className="app-shell">
-      <header className="nav">
-        <div className="brand">
-          <div className="brand-mark">
-            <Sparkle />
-          </div>
-          <div>
-            <div className="brand-title">{sessionTitle}</div>
-            <p className="brand-subtitle">{sessionStatus} session</p>
-          </div>
-        </div>
-        <div className="nav-actions">
-          <Button variant="secondary" onClick={() => navigate('/')}>
-            Sessions
+      {/* Header */}
+      <header className="top-bar">
+        <Button variant="ghost" onClick={() => navigate('/')}>← INDEX</Button>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <Button variant="primary" className="desktop-capture-btn" onClick={handleCapture} disabled={uploading}>
+            {uploading ? 'PROCESSING...' : '+ ADD_DATA'}
           </Button>
-          <Button variant="ghost" onClick={handleEnd}>
-            End session
-          </Button>
-          <DoodleWave />
+          {sessionData?.isLive && (
+            <Button variant="secondary" onClick={handleEnd}>TERMINATE</Button>
+          )}
         </div>
       </header>
 
-      <section className="hero-grid">
-        <Card className="reveal">
-          <div className="section-kicker">Capture</div>
-          <h2 className="section-title">Drop a wall photo</h2>
-          <p className="muted">
-            We auto-mask the dominant hold color and prep a clean route overlay.
-          </p>
-          <button type="button" className="dropzone" onClick={handleUpload} disabled={uploading}>
-            <div style={{ fontWeight: 600 }}>
-              {uploading ? 'Uploading...' : 'Click to upload a photo'}
-            </div>
-            <p className="muted" style={{ margin: '6px 0 0' }}>
-              JPG or PNG. Best results with the wall centered.
-            </p>
-          </button>
-          <div className="footer-actions" style={{ marginTop: '16px' }}>
-            <Button variant="primary" onClick={handleUpload} disabled={uploading}>
-              {uploading ? 'Uploading...' : 'Upload photo'}
-            </Button>
-            <Badge label="Auto mask" variant="brand" />
-            <Badge label="Brush edits" variant="neutral" />
+      {/* Session Manifesto */}
+      <div style={{ borderBottom: '1px solid var(--border-default)', paddingBottom: 'var(--space-4)' }}>
+        <div className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+          REF: {sessionData?.id.slice(0, 8).toUpperCase()}
+        </div>
+        <h1 style={{ fontSize: '2rem', margin: 'var(--space-2) 0' }}>
+          {sessionData?.title ?? 'Session Log'}
+        </h1>
+        <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
+          <div className="mono" style={{ fontSize: '0.8rem' }}>
+            COUNT: {sessionData?.problemCount}
           </div>
-          {error ? <Badge label={error} variant="warning" /> : null}
-        </Card>
+          <div className="mono" style={{ fontSize: '0.8rem' }}>
+            COMPLETED: {sessionData?.sendCount}
+          </div>
+        </div>
+      </div>
 
-        <Card className="card-soft reveal">
-          <div className="section-kicker">Session status</div>
-          <h2 className="section-title">Keep it flowing</h2>
-          <p className="muted">Capture each problem as you move. Logs stay light and fast.</p>
-          <div className="pill-group" style={{ marginTop: '12px' }}>
-            <Badge label={sessionStatus === 'Live' ? 'Live capture' : 'Ended'} variant="brand" />
-            <Badge label={`${problems.length} problems`} variant="neutral" />
-          </div>
-          <div style={{ marginTop: '16px' }}>
-            <DoodleArrow />
-          </div>
-        </Card>
-      </section>
+      {error && <Badge label={error} variant="warning" />}
 
-      <section>
-        <div className="section-kicker">Problems</div>
-        <h2 className="section-title">Captured routes</h2>
-        {loading ? (
-          <Card className="card-soft">
-            <p className="muted">Loading problems...</p>
-          </Card>
-        ) : problems.length === 0 ? (
-          <Card className="card-soft">
-            <p className="muted">No problems captured yet.</p>
-          </Card>
-        ) : (
-          <div className="gallery">
-            {problems.map((problem) => (
-              <ProblemCard
-                key={problem.problemId}
-                title={problem.gradeLabel ?? 'Unrated'}
-                subtitle={problem.outcome ? `Outcome: ${problem.outcome}` : 'Log your outcome'}
-                imageUrl={problem.imageUrl}
-                maskUrl={problem.maskUrl}
-                outcome={problem.outcome}
-                gradeLabel={problem.gradeLabel}
-                onClick={() => navigate(`/problem/${problem.problemId}`)}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      {/* Problems Grid - Image based */}
+      {loading ? (
+        <div className="grid two">
+          <Skeleton variant="image" />
+          <Skeleton variant="image" />
+        </div>
+      ) : problems.length === 0 ? (
+        <button
+          type="button"
+          onClick={handleCapture}
+          style={{
+            width: '100%',
+            aspectRatio: '4/3',
+            background: 'var(--bg-secondary)',
+            border: '2px dashed var(--border-strong)',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 'var(--space-2)',
+          }}
+        >
+          <span className="serif" style={{ fontSize: '1.5rem' }}>Empty Field</span>
+          <span className="mono">NO_DATA_AVAILABLE</span>
+        </button>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
+          {problems.map((problem, i) => (
+            <button
+              key={problem.problemId}
+              type="button"
+              onClick={() => navigate(`/problem/${problem.problemId}`)}
+              className="reveal"
+              style={{
+                animationDelay: `${i * 40}ms`,
+                padding: 0,
+                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-card)',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                textAlign: 'left',
+                position: 'relative'
+              }}
+            >
+              {/* Image */}
+              <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1' }}>
+                {problem.imageUrl && (
+                  <img
+                    src={problem.imageUrl}
+                    alt="Problem"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'sepia(10%) contrast(110%)' }}
+                  />
+                )}
+
+                {/* Technical Overlay */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  pointerEvents: 'none'
+                }}>
+                  {/* Crosshair */}
+                  <div style={{
+                    position: 'absolute', top: '50%', left: '50%',
+                    width: '10px', height: '10px',
+                    border: '1px solid rgba(255,255,255,0.5)',
+                    transform: 'translate(-50%, -50%)',
+                    borderRadius: '50%'
+                  }} />
+                </div>
+
+                {/* Outcome Badge */}
+                {problem.outcome && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0, left: 0,
+                    background: problem.outcome === 'send' || problem.outcome === 'flash' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+                    color: problem.outcome === 'send' || problem.outcome === 'flash' ? 'white' : 'var(--text-secondary)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.6rem',
+                    padding: '2px 6px',
+                    borderBottomRightRadius: '2px'
+                  }}>
+                    {problem.outcome.toUpperCase()}
+                  </div>
+                )}
+              </div>
+
+              {/* Meta */}
+              <div style={{ padding: '8px', borderTop: '1px solid var(--border-subtle)' }}>
+                <div className="mono" style={{ fontSize: '0.7rem' }}>
+                  GRADE: {problem.gradeLabel ?? 'N/A'}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <FAB onClick={handleCapture} aria-busy={uploading} />
 
       <input
         ref={fileRef}
         type="file"
         accept="image/*"
+        capture="environment"
         onChange={handleFile}
         style={{ display: 'none' }}
       />
