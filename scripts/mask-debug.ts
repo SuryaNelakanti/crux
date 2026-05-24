@@ -1,7 +1,12 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import { generateMask, rgbToHsl, type HSL } from '../packages/vision/src/index.ts';
+import {
+  calculateBinaryMaskMetrics,
+  generateRouteMask,
+  type HSL,
+  rgbToHsl,
+} from '../packages/vision/src';
 
 type Args = {
   imagePath: string;
@@ -12,6 +17,7 @@ type Args = {
   seedNY?: number;
   seedWindow: number;
   maxWidth?: number;
+  gtMaskPath?: string;
 };
 
 const MASK_TINT = { r: 47, g: 191, b: 156, a: 235 };
@@ -62,6 +68,11 @@ const parseArgs = (argv: string[]): Args => {
     if (value === '--max-width' && argv[i + 1]) {
       args.maxWidth = Number(argv[i + 1]);
       i += 1;
+      continue;
+    }
+    if (value === '--gt-mask' && argv[i + 1]) {
+      args.gtMaskPath = argv[i + 1];
+      i += 1;
     }
   }
   return args;
@@ -99,12 +110,8 @@ const sampleSeedColor = (
 
   return rgbToHsl({
     r: count ? Math.round(sumR / count) : pixels[(clampedY * width + clampedX) * 4],
-    g: count
-      ? Math.round(sumG / count)
-      : pixels[(clampedY * width + clampedX) * 4 + 1],
-    b: count
-      ? Math.round(sumB / count)
-      : pixels[(clampedY * width + clampedX) * 4 + 2],
+    g: count ? Math.round(sumG / count) : pixels[(clampedY * width + clampedX) * 4 + 1],
+    b: count ? Math.round(sumB / count) : pixels[(clampedY * width + clampedX) * 4 + 2],
   });
 };
 
@@ -129,6 +136,32 @@ const countMask = (mask: Uint8Array) => {
   return hits;
 };
 
+const buildAllHoldsMask = (labels: Int32Array): Uint8Array => {
+  const mask = new Uint8Array(labels.length);
+  for (let i = 0; i < labels.length; i += 1) {
+    if (labels[i] >= 0) mask[i] = 1;
+  }
+  return mask;
+};
+
+const readGroundTruthMask = async (
+  gtMaskPath: string | undefined,
+  width: number,
+  height: number
+): Promise<Uint8Array | null> => {
+  if (!gtMaskPath) return null;
+  const { data } = await sharp(path.resolve(gtMaskPath))
+    .resize({ width, height, fit: 'fill' })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const mask = new Uint8Array(width * height);
+  for (let i = 0; i < mask.length; i += 1) {
+    mask[i] = data[i] > 0 ? 1 : 0;
+  }
+  return mask;
+};
+
 const run = async () => {
   const args = parseArgs(process.argv.slice(2));
   const imagePath = path.resolve(args.imagePath);
@@ -138,7 +171,10 @@ const run = async () => {
   if (args.maxWidth) {
     imagePipeline.resize({ width: args.maxWidth });
   }
-  const { data, info } = await imagePipeline.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = await imagePipeline
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   const pixels = new Uint8ClampedArray(data);
   const width = info.width ?? 0;
   const height = info.height ?? 0;
@@ -160,7 +196,7 @@ const run = async () => {
     seedColor = sampleSeedColor(pixels, width, height, seedX, seedY, args.seedWindow);
   }
 
-  const result = generateMask({
+  const result = generateRouteMask({
     pixels,
     width,
     height,
@@ -169,20 +205,37 @@ const run = async () => {
   });
   const hits = countMask(result.mask);
   const coverage = width * height ? hits / (width * height) : 0;
+  const allHoldsMask = buildAllHoldsMask(result.detection.labels);
+  const groundTruthMask = await readGroundTruthMask(args.gtMaskPath, width, height);
 
   const rgba = buildMaskRgba(result.mask, width, height);
-  const maskPath = path.join(args.outDir, 'mask.png');
+  const allHoldsRgba = buildMaskRgba(allHoldsMask, width, height);
+  const maskPath = path.join(args.outDir, 'route-mask.png');
+  const allHoldsPath = path.join(args.outDir, 'all-holds-mask.png');
   const overlayPath = path.join(args.outDir, 'overlay.png');
+  const allHoldsOverlayPath = path.join(args.outDir, 'all-holds-overlay.png');
   const reportPath = path.join(args.outDir, 'report.json');
 
-  await sharp(rgba, { raw: { width, height, channels: 4 } }).png().toFile(maskPath);
+  await sharp(rgba, { raw: { width, height, channels: 4 } })
+    .png()
+    .toFile(maskPath);
+  await sharp(allHoldsRgba, { raw: { width, height, channels: 4 } })
+    .png()
+    .toFile(allHoldsPath);
 
   await sharp(imagePath)
     .resize({ width, height })
     .ensureAlpha()
-    .composite([{ input: rgba, raw: { width, height, channels: 4 } }])
+    .composite([{ input: Buffer.from(rgba), raw: { width, height, channels: 4 } }])
     .png()
     .toFile(overlayPath);
+
+  await sharp(imagePath)
+    .resize({ width, height })
+    .ensureAlpha()
+    .composite([{ input: Buffer.from(allHoldsRgba), raw: { width, height, channels: 4 } }])
+    .png()
+    .toFile(allHoldsOverlayPath);
 
   await writeFile(
     reportPath,
@@ -196,12 +249,21 @@ const run = async () => {
         seedColor: seedColor ?? null,
         selectedSeed: result.seedColor,
         coverage,
-        clusters: result.clusters.map((cluster) => ({
-          center: cluster.center,
-          count: cluster.count,
-          avgSaturation: cluster.avgSaturation,
-          score: cluster.score,
+        fallback: result.fallback,
+        selectedGroupId: result.selectedGroupId,
+        holdCount: result.detection.holds.length,
+        groupCount: result.groups.length,
+        groups: result.groups.map((group) => ({
+          id: group.id,
+          holdIds: group.holdIds,
+          avgColor: group.avgColor,
+          area: group.area,
+          score: group.score,
+          bbox: group.bbox,
+          holdCount: group.holdCount,
+          selection: group.selection ?? null,
         })),
+        metrics: groundTruthMask ? calculateBinaryMaskMetrics(result.mask, groundTruthMask) : null,
       },
       null,
       2
@@ -210,7 +272,9 @@ const run = async () => {
   );
 
   console.log(`Mask saved: ${maskPath}`);
+  console.log(`All-holds mask saved: ${allHoldsPath}`);
   console.log(`Overlay saved: ${overlayPath}`);
+  console.log(`All-holds overlay saved: ${allHoldsOverlayPath}`);
   console.log(`Report saved: ${reportPath}`);
 };
 

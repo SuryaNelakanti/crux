@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crux Heidelberg Annotator</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #101114;
+        color: #f5f7fb;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        min-height: 100vh;
+      }
+      header,
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        background: #17191f;
+        border-bottom: 1px solid #2b2f39;
+      }
+      footer {
+        border-top: 1px solid #2b2f39;
+        border-bottom: 0;
+        color: #b8bfca;
+        font-size: 12px;
+      }
+      button,
+      select,
+      input {
+        height: 34px;
+        border: 1px solid #3a404d;
+        border-radius: 6px;
+        background: #222630;
+        color: #f5f7fb;
+        padding: 0 10px;
+      }
+      button {
+        cursor: pointer;
+      }
+      button.primary {
+        background: #2f6df6;
+        border-color: #2f6df6;
+      }
+      button.danger {
+        background: #7d2630;
+        border-color: #9a3541;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        min-height: 0;
+      }
+      aside {
+        border-right: 1px solid #2b2f39;
+        background: #151820;
+        min-height: 0;
+        overflow: auto;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .stack {
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+      }
+      .image-list {
+        display: grid;
+      }
+      .image-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 10px;
+        border: 0;
+        border-bottom: 1px solid #242935;
+        border-radius: 0;
+        text-align: left;
+        background: transparent;
+      }
+      .image-item.active {
+        background: #25314a;
+      }
+      .image-item.annotated::after {
+        content: "saved";
+        color: #8de6a3;
+        font-size: 11px;
+      }
+      .image-item.candidate {
+        border-left: 3px solid #ffb454;
+      }
+      .image-item .rank {
+        color: #ffcf88;
+        font-size: 11px;
+      }
+      .stage {
+        position: relative;
+        overflow: auto;
+        background: #0b0c10;
+      }
+      canvas {
+        display: block;
+        margin: 16px auto;
+        background: #050608;
+        cursor: crosshair;
+      }
+      .grow {
+        flex: 1;
+      }
+      .muted {
+        color: #9ba3af;
+      }
+      .pill {
+        padding: 4px 8px;
+        border: 1px solid #343a46;
+        border-radius: 999px;
+        color: #c7ced9;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <button id="openDir" class="primary">Open Heidelberg folder</button>
+      <button id="loadCandidates">Load candidates</button>
+      <input id="candidateFile" type="file" accept="application/json,.json" hidden />
+      <button id="prev">Prev</button>
+      <button id="next">Next</button>
+      <select id="dataset">
+        <option value="all">all</option>
+        <option value="bh">bh</option>
+        <option value="bh-phone">bh-phone</option>
+        <option value="sm">sm</option>
+      </select>
+      <input id="filter" placeholder="filter filename" />
+      <label class="row muted"><input id="candidateOnly" type="checkbox" /> Candidate batch</label>
+      <span id="status" class="pill">No folder selected</span>
+      <span class="grow"></span>
+      <button id="finish">Finish polygon</button>
+      <button id="undoPoint">Undo point</button>
+      <button id="deletePoly" class="danger">Delete polygon</button>
+      <button id="save" class="primary">Save</button>
+    </header>
+    <main>
+      <aside>
+        <div class="stack">
+          <div class="muted">Draw: click points, then Finish polygon. Select polygon: click near it. Save writes <code>manual-annotation.json</code>.</div>
+          <div id="meta" class="muted">0 images</div>
+        </div>
+        <div id="imageList" class="image-list"></div>
+      </aside>
+      <section class="stage">
+        <canvas id="canvas"></canvas>
+      </section>
+    </main>
+    <footer>
+      <span>Autosaves after each finished/deleted polygon when folder write permission is granted.</span>
+      <span id="current" class="grow"></span>
+    </footer>
+    <script>
+      const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+      const state = {
+        root: null,
+        images: [],
+        index: 0,
+        annotations: new Map(),
+        currentPoints: [],
+        selectedPolygon: -1,
+        candidates: new Map(),
+        objectUrl: null,
+        image: null,
+        scale: 1,
+      };
+
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const statusEl = document.getElementById("status");
+      const listEl = document.getElementById("imageList");
+      const metaEl = document.getElementById("meta");
+      const currentEl = document.getElementById("current");
+      const datasetEl = document.getElementById("dataset");
+      const filterEl = document.getElementById("filter");
+      const candidateOnlyEl = document.getElementById("candidateOnly");
+      const candidateFileEl = document.getElementById("candidateFile");
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function relativeJoin(...parts) {
+        return parts.filter(Boolean).join("/").replace(/\\/g, "/");
+      }
+
+      function imageId(image) {
+        return `${image.dirName}_${image.name.replace(/\.[^.]+$/, "")}`;
+      }
+
+      function polygonFromShape(shape) {
+        const xs = shape.all_points_x || [];
+        const ys = shape.all_points_y || [];
+        if (xs.length < 3 || xs.length !== ys.length) return null;
+        return xs.map((x, index) => ({ x: Number(x), y: Number(ys[index]) }));
+      }
+
+      function proposalRowsFromVia(raw) {
+        const rows = [];
+        const metadata = raw._via_img_metadata || {};
+        for (const entry of Object.values(metadata)) {
+          const proposals = [];
+          for (const region of entry.regions || []) {
+            const polygon = polygonFromShape(region.shape_attributes || {});
+            if (polygon) proposals.push({ polygon });
+          }
+          rows.push({
+            id: String(entry.id || "").trim(),
+            relativePath: entry.filename,
+            proposals,
+          });
+        }
+        return rows;
+      }
+
+      function normalizeCandidateRows(raw) {
+        if (Array.isArray(raw)) return raw;
+        if (raw && Array.isArray(raw.images)) return raw.images;
+        if (raw && Array.isArray(raw.candidates)) return raw.candidates;
+        if (raw?._via_img_metadata) return proposalRowsFromVia(raw);
+        if (raw?.id) return [raw];
+        return [];
+      }
+
+      async function listImages(root) {
+        const out = [];
+        for (const dirName of ["bh", "bh-phone", "sm"]) {
+          let dir;
+          try {
+            dir = await root.getDirectoryHandle(dirName);
+          } catch {
+            continue;
+          }
+          for await (const [name, handle] of dir.entries()) {
+            const extension = name.slice(name.lastIndexOf(".")).toLowerCase();
+            if (handle.kind === "file" && IMAGE_EXTENSIONS.has(extension)) {
+              out.push({ path: relativeJoin(dirName, name), dirName, name, handle });
+            }
+          }
+        }
+        return out.sort((a, b) => a.path.localeCompare(b.path));
+      }
+
+      async function loadManualAnnotations(root) {
+        try {
+          const handle = await root.getFileHandle("manual-annotation.json");
+          const raw = JSON.parse(await (await handle.getFile()).text());
+          const metadata = raw._via_img_metadata || {};
+          for (const entry of Object.values(metadata)) {
+            const polygons = [];
+            for (const region of entry.regions || []) {
+              const polygon = polygonFromShape(region.shape_attributes || {});
+              if (polygon) polygons.push(polygon);
+            }
+            if (polygons.length) state.annotations.set(entry.filename, polygons);
+          }
+        } catch {
+          state.annotations.clear();
+        }
+      }
+
+      function currentImage() {
+        return visibleImages()[state.index] || null;
+      }
+
+      function visibleImages() {
+        const dataset = datasetEl.value;
+        const filter = filterEl.value.trim().toLowerCase();
+        return state.images.filter((image) => {
+          const id = imageId(image);
+          const datasetOk = dataset === "all" || image.dirName === dataset;
+          const filterOk = !filter || image.path.toLowerCase().includes(filter);
+          const candidateOk = !candidateOnlyEl.checked || state.candidates.has(id);
+          return datasetOk && filterOk && candidateOk;
+        });
+      }
+
+      function renderList() {
+        const images = visibleImages();
+        state.index = Math.min(state.index, Math.max(0, images.length - 1));
+        const candidateText = state.candidates.size ? ` / ${state.candidates.size} candidates` : "";
+        metaEl.textContent = `${images.length} visible / ${state.images.length} total / ${state.annotations.size} annotated${candidateText}`;
+        listEl.textContent = "";
+        images.forEach((image, index) => {
+          const candidate = state.candidates.get(imageId(image));
+          const button = document.createElement("button");
+          button.className = `image-item${index === state.index ? " active" : ""}${state.annotations.has(image.path) ? " annotated" : ""}${candidate ? " candidate" : ""}`;
+          const name = document.createElement("span");
+          name.textContent = image.path;
+          button.appendChild(name);
+          if (candidate) {
+            const rank = document.createElement("span");
+            rank.className = "rank";
+            rank.textContent = `#${candidate.rank}`;
+            button.appendChild(rank);
+          }
+          button.onclick = () => {
+            state.index = index;
+            state.currentPoints = [];
+            state.selectedPolygon = -1;
+            loadImage();
+          };
+          listEl.appendChild(button);
+        });
+      }
+
+      async function loadImage() {
+        const item = currentImage();
+        if (!item) {
+          canvas.width = 1;
+          canvas.height = 1;
+          draw();
+          return;
+        }
+        if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+        state.objectUrl = URL.createObjectURL(await item.handle.getFile());
+        const image = new Image();
+        image.onload = () => {
+          state.image = image;
+          state.scale = Math.min(1, (window.innerWidth - 340) / image.naturalWidth, (window.innerHeight - 110) / image.naturalHeight);
+          canvas.width = Math.max(1, Math.round(image.naturalWidth * state.scale));
+          canvas.height = Math.max(1, Math.round(image.naturalHeight * state.scale));
+          const candidate = state.candidates.get(imageId(item));
+          currentEl.textContent = `${item.path} (${image.naturalWidth}x${image.naturalHeight})${candidate ? ` / candidate #${candidate.rank}` : ""}`;
+          draw();
+          renderList();
+        };
+        image.src = state.objectUrl;
+      }
+
+      async function loadCandidateFile(file) {
+        const raw = JSON.parse(await file.text());
+        const rows = normalizeCandidateRows(raw);
+        state.candidates.clear();
+        rows.forEach((row, index) => {
+          if (!row) return;
+          const id = row.id || (row.relativePath ? row.relativePath.replace(/\.[^.]+$/, "").replace(/\//g, "_") : null);
+          if (!id) return;
+          const candidate = { ...row, id: String(id), rank: index + 1 };
+          state.candidates.set(candidate.id, candidate);
+          if (Array.isArray(row.proposals) && row.relativePath && !state.annotations.has(row.relativePath)) {
+            const polygons = row.proposals
+              .map((proposal) => proposal?.polygon)
+              .filter((polygon) => Array.isArray(polygon) && polygon.length >= 3);
+            if (polygons.length) state.annotations.set(row.relativePath, polygons);
+          }
+        });
+        candidateOnlyEl.checked = state.candidates.size > 0;
+        state.index = 0;
+        setStatus(`Loaded ${state.candidates.size} candidates/proposal drafts`);
+        renderList();
+        await loadImage();
+      }
+
+      function toImagePoint(event) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: Math.round((event.clientX - rect.left) / state.scale),
+          y: Math.round((event.clientY - rect.top) / state.scale),
+        };
+      }
+
+      function toCanvasPoint(point) {
+        return { x: point.x * state.scale, y: point.y * state.scale };
+      }
+
+      function drawPolygon(points, stroke, fill, width = 2) {
+        if (!points.length) return;
+        ctx.beginPath();
+        points.forEach((point, index) => {
+          const canvasPoint = toCanvasPoint(point);
+          if (index === 0) ctx.moveTo(canvasPoint.x, canvasPoint.y);
+          else ctx.lineTo(canvasPoint.x, canvasPoint.y);
+        });
+        if (points.length >= 3) ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = width;
+        if (points.length >= 3) ctx.fill();
+        ctx.stroke();
+        for (const point of points) {
+          const canvasPoint = toCanvasPoint(point);
+          ctx.beginPath();
+          ctx.arc(canvasPoint.x, canvasPoint.y, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = stroke;
+          ctx.fill();
+        }
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (state.image) ctx.drawImage(state.image, 0, 0, canvas.width, canvas.height);
+        const item = currentImage();
+        const polygons = item ? state.annotations.get(item.path) || [] : [];
+        polygons.forEach((polygon, index) => {
+          const selected = index === state.selectedPolygon;
+          drawPolygon(polygon, selected ? "#ffdc5d" : "#54d6ff", selected ? "rgba(255,220,93,.22)" : "rgba(84,214,255,.18)", selected ? 4 : 2);
+        });
+        drawPolygon(state.currentPoints, "#ff5dac", "rgba(255,93,172,.16)", 2);
+      }
+
+      function pointNearPolygon(point, polygon) {
+        return polygon.some((candidate) => Math.hypot(candidate.x - point.x, candidate.y - point.y) < 18 / state.scale);
+      }
+
+      async function save() {
+        if (!state.root) return;
+        const metadata = {};
+        for (const [filename, polygons] of state.annotations.entries()) {
+          const regions = polygons.map((polygon) => ({
+            shape_attributes: {
+              name: "polygon",
+              all_points_x: polygon.map((point) => Math.round(point.x)),
+              all_points_y: polygon.map((point) => Math.round(point.y)),
+            },
+            region_attributes: {
+              label_type: "manual",
+              hold_type: "hold",
+            },
+          }));
+          metadata[`${filename}${regions.length}`] = {
+            filename,
+            size: -1,
+            regions,
+            file_attributes: {},
+          };
+        }
+        const payload = {
+          _via_settings: {},
+          _via_img_metadata: metadata,
+          _via_attributes: {
+            region: {
+              hold_type: { type: "dropdown", options: { hold: "", volume: "" }, default_options: { hold: true } },
+              label_type: { type: "text", default_value: "manual" },
+            },
+            file: {},
+          },
+        };
+        const handle = await state.root.getFileHandle("manual-annotation.json", { create: true });
+        const writable = await handle.createWritable();
+        await writable.write(JSON.stringify(payload, null, 2));
+        await writable.close();
+        setStatus(`Saved ${state.annotations.size} annotated images`);
+        renderList();
+      }
+
+      async function autosave() {
+        try {
+          await save();
+        } catch (error) {
+          setStatus(`Save failed: ${error.message}`);
+        }
+      }
+
+      document.getElementById("openDir").onclick = async () => {
+        if (!("showDirectoryPicker" in window)) {
+          setStatus("Use Chrome/Edge; File System Access API is required");
+          return;
+        }
+        state.root = await window.showDirectoryPicker({ mode: "readwrite" });
+        state.images = await listImages(state.root);
+        await loadManualAnnotations(state.root);
+        state.index = 0;
+        setStatus("Folder loaded");
+        renderList();
+        await loadImage();
+      };
+
+      document.getElementById("loadCandidates").onclick = () => {
+        candidateFileEl.click();
+      };
+      candidateFileEl.onchange = async () => {
+        const file = candidateFileEl.files?.[0];
+        if (file) await loadCandidateFile(file);
+        candidateFileEl.value = "";
+      };
+
+      canvas.onclick = (event) => {
+        const item = currentImage();
+        if (!item) return;
+        const point = toImagePoint(event);
+        const polygons = state.annotations.get(item.path) || [];
+        const selected = polygons.findIndex((polygon) => pointNearPolygon(point, polygon));
+        if (selected >= 0 && state.currentPoints.length === 0) {
+          state.selectedPolygon = selected;
+        } else {
+          state.currentPoints.push(point);
+          state.selectedPolygon = -1;
+        }
+        draw();
+      };
+
+      document.getElementById("finish").onclick = async () => {
+        const item = currentImage();
+        if (!item || state.currentPoints.length < 3) return;
+        const polygons = state.annotations.get(item.path) || [];
+        polygons.push(state.currentPoints);
+        state.annotations.set(item.path, polygons);
+        state.currentPoints = [];
+        state.selectedPolygon = polygons.length - 1;
+        draw();
+        renderList();
+        await autosave();
+      };
+
+      document.getElementById("undoPoint").onclick = () => {
+        state.currentPoints.pop();
+        draw();
+      };
+
+      document.getElementById("deletePoly").onclick = async () => {
+        const item = currentImage();
+        if (!item || state.selectedPolygon < 0) return;
+        const polygons = state.annotations.get(item.path) || [];
+        polygons.splice(state.selectedPolygon, 1);
+        if (polygons.length) state.annotations.set(item.path, polygons);
+        else state.annotations.delete(item.path);
+        state.selectedPolygon = -1;
+        draw();
+        renderList();
+        await autosave();
+      };
+
+      document.getElementById("save").onclick = save;
+      document.getElementById("prev").onclick = () => {
+        state.index = Math.max(0, state.index - 1);
+        state.currentPoints = [];
+        state.selectedPolygon = -1;
+        loadImage();
+      };
+      document.getElementById("next").onclick = () => {
+        state.index = Math.min(visibleImages().length - 1, state.index + 1);
+        state.currentPoints = [];
+        state.selectedPolygon = -1;
+        loadImage();
+      };
+      datasetEl.onchange = () => {
+        state.index = 0;
+        renderList();
+        loadImage();
+      };
+      filterEl.oninput = () => {
+        state.index = 0;
+        renderList();
+        loadImage();
+      };
+      candidateOnlyEl.onchange = () => {
+        state.index = 0;
+        renderList();
+        loadImage();
+      };
+
+      window.onkeydown = (event) => {
+        if (event.key === "Enter") document.getElementById("finish").click();
+        if (event.key === "Backspace") document.getElementById("undoPoint").click();
+        if (event.key === "Delete") document.getElementById("deletePoly").click();
+        if (event.key === "ArrowLeft") document.getElementById("prev").click();
+        if (event.key === "ArrowRight") document.getElementById("next").click();
+      };
+    </script>
+  </body>
+</html>

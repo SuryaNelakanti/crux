@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+.venv-vision/
+__pycache__/
+*.pyc
 
 # Build outputs
 dist/
@@ -42,6 +45,13 @@ coverage/
 
 # Local debug outputs
 scripts/output/
+.data/
+.models/
+runs/
+*.pt
+*.onnx
+*.engine
+*.mlpackage/
 
 # Supabase
 supabase/.branches

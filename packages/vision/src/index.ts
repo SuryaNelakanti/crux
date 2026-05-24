@@ -10,6 +10,18 @@
  * - Unit-testable with fixtures
  */
 
+export {
+  type BinaryMaskMetrics,
+  bestMaskIoU,
+  calculateBinaryMaskMetrics,
+  calculateComponentRecall,
+  type Point,
+  type Polygon,
+  percentile,
+  rasterizePolygons,
+  scalePolygon,
+  unionMasks,
+} from './benchmark';
 // Color utilities
 export {
   colorDistanceLab,
@@ -23,7 +35,20 @@ export {
   rgbToHsl,
   rgbToLab,
 } from './color';
-
+export {
+  getRouteLabel,
+  parseViaAnnotations,
+  type ViaImageAnnotation,
+  type ViaRegion,
+} from './dataset/via';
+// Hold detection
+export { detectHolds, type HoldCandidate, type HoldDetectionResult } from './holds';
+export {
+  type ContrastDetectionParams,
+  type ContrastDetectionResult,
+  type ContrastHoldCandidate,
+  detectHoldsContrast,
+} from './holds/contrast';
 // Mask generation
 export {
   type ColorCluster,
@@ -35,13 +60,19 @@ export {
   type MaskGenerationResult,
   scoreCluster,
 } from './mask';
-
-// Hold detection
-export { detectHolds, type HoldCandidate, type HoldDetectionResult } from './holds';
 export {
-  detectHoldsContrast,
-  type ContrastDetectionParams,
-  type ContrastDetectionResult,
-  type ContrastHoldCandidate,
-} from './holds/contrast';
-
+  type HashReference,
+  type ModelArtifact,
+  modelMetadataFromCard,
+  type RouteMaskModelCard,
+  type RouteMaskModelMetadata,
+  validateRouteMaskModelCard,
+} from './ml/model-card';
+export {
+  buildRouteMaskForGroup,
+  generateRouteMask,
+  groupHoldsByColor,
+  type RouteHoldGroup,
+  type RouteMaskGenerationInput,
+  type RouteMaskGenerationResult,
+} from './route';

@@ -18,3 +18,12 @@ Outputs:
 - `scripts/output/mask.png` (tinted mask)
 - `scripts/output/overlay.png` (mask composited over the source)
 - `scripts/output/report.json` (coverage, confidence, clusters)
+
+## Dataset and ML
+
+Benchmark scripts live in `scripts/vision/`.
+Opt-in local ML training/export scripts live in `scripts/vision-ml/`.
+
+See:
+- `docs/vision-benchmark.md`
+- `docs/vision-ml.md`

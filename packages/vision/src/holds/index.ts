@@ -136,12 +136,7 @@ export function detectHolds(params: {
       if (x > maxX) maxX = x;
       if (y > maxY) maxY = y;
 
-      const neighbors = [
-        idx - 1,
-        idx + 1,
-        idx - width,
-        idx + width,
-      ];
+      const neighbors = [idx - 1, idx + 1, idx - width, idx + width];
       for (const nidx of neighbors) {
         if (nidx < 0 || nidx >= total) continue;
         if (visited[nidx]) continue;

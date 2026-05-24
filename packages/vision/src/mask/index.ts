@@ -7,7 +7,7 @@
  * Takes pixel data, returns mask data.
  */
 
-import { type HSL, type LAB, type RGB, hslToRgb, rgbToHsl, rgbToLab } from '../color';
+import { type HSL, hslToRgb, type LAB, type RGB, rgbToHsl, rgbToLab } from '../color';
 
 const DEFAULT_K = 5;
 const MAX_SAMPLE_PIXELS = 15000;
@@ -25,9 +25,7 @@ const hslDistance = (a: HSL, b: HSL): number => {
   const hue = Math.min(rawHue, 360 - rawHue) / 180; // 0..1
   const sat = (a.s - b.s) / 100;
   const light = (a.l - b.l) / 100;
-  return Math.sqrt(
-    (hue * HUE_WEIGHT) ** 2 + (sat * SAT_WEIGHT) ** 2 + (light * LIGHT_WEIGHT) ** 2
-  );
+  return Math.sqrt((hue * HUE_WEIGHT) ** 2 + (sat * SAT_WEIGHT) ** 2 + (light * LIGHT_WEIGHT) ** 2);
 };
 
 const labDistance = (a: LAB, b: LAB): number =>
@@ -65,12 +63,8 @@ const sampleSeedLab = (
   }
   const rgb: RGB = {
     r: count ? Math.round(sumR / count) : pixels[(seedPoint.y * width + seedPoint.x) * 4],
-    g: count
-      ? Math.round(sumG / count)
-      : pixels[(seedPoint.y * width + seedPoint.x) * 4 + 1],
-    b: count
-      ? Math.round(sumB / count)
-      : pixels[(seedPoint.y * width + seedPoint.x) * 4 + 2],
+    g: count ? Math.round(sumG / count) : pixels[(seedPoint.y * width + seedPoint.x) * 4 + 1],
+    b: count ? Math.round(sumB / count) : pixels[(seedPoint.y * width + seedPoint.x) * 4 + 2],
   };
   return rgbToLab(rgb);
 };
@@ -213,7 +207,10 @@ const buildSeededMask = (params: {
     const rgb = getRgbAt(pixels, offset);
     const hsl = rgbToHsl(rgb);
     if (saturationFloor && hsl.s < saturationFloor) continue;
-    if (wallClusterCenter && hslDistance(hsl, wallClusterCenter) < hslDistance(hsl, seedHsl) * 0.9) {
+    if (
+      wallClusterCenter &&
+      hslDistance(hsl, wallClusterCenter) < hslDistance(hsl, seedHsl) * 0.9
+    ) {
       continue;
     }
     const lab = rgbToLab(rgb);
@@ -332,7 +329,7 @@ export function generateMask(input: MaskGenerationInput): MaskGenerationResult {
     const seedHsl = seedColor ?? selectedSeed;
 
     const hueBoost =
-      (seedHsl.h >= 35 && seedHsl.h <= 90) || (seedHsl.h >= 300 || seedHsl.h <= 20) ? 4 : 0;
+      (seedHsl.h >= 35 && seedHsl.h <= 90) || seedHsl.h >= 300 || seedHsl.h <= 20 ? 4 : 0;
     const pastelBoost = seedHsl.s < 35 ? 8 : 0;
     const lightBoost = seedHsl.l > 70 ? 6 : 0;
     const baseLab = 18 + pastelBoost + lightBoost + hueBoost;

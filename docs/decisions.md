@@ -364,3 +364,122 @@ The previous K-means clustering approach for hold detection often failed on mult
 - "White Doodle" aesthetic aligns with the Atlas/Journal design language
 - Users have more control via the Wall Picker
 - Backend API remains stable despite the detection engine swap
+
+---
+
+## ADR-017: Dataset-driven vision benchmark
+
+**Date:** 2026-05-11
+
+**Status:** Accepted
+
+**Context:**
+Synthetic mask tests were not enough to improve real gym photo quality. The app
+needs repeatable benchmark metrics against annotated indoor climbing imagery
+before further detector tuning can be trusted.
+
+**Decision:**
+Use the Heidelberg/Kaggle indoor climbing hold and route segmentation dataset as
+the primary local benchmark. Keep raw data and generated outputs ignored. Add
+pure vision APIs for route grouping and mask generation, plus local scripts to
+import VIA annotations, benchmark the detector, and render visual QA galleries.
+
+**Consequences:**
+- Detection changes can be evaluated with IoU, recall, component recall, route
+  grouping quality, and runtime.
+- Runtime app code uses the same `generateRouteMask` API as the benchmark.
+- No ML model is added to the app in this phase.
+
+---
+
+## ADR-018: Opt-in local ML route mask pipeline
+
+**Date:** 2026-05-12
+
+**Status:** Accepted
+
+**Context:**
+The deterministic detector is now benchmarkable, but world-class route masks
+need a trained local model for difficult lighting, low-contrast holds, and dense
+route overlap. The mobile product invariant still requires offline capture and
+must not depend on a server-side model.
+
+**Decision:**
+Add an opt-in Python ML pipeline that trains a YOLO segmentation model on the
+normalized Heidelberg manifest. The model predicts individual hold instances;
+Crux post-processing groups predicted holds into route candidates by color.
+Keep raw data, training runs, and exported models ignored under `.data/` and
+`.models/`. Do not make ML the production default until validation gates and
+local runtime constraints are satisfied.
+
+**Consequences:**
+- Training, evaluation, export, and single-image QA are reproducible locally.
+- The app can adopt a local model later without losing the deterministic
+  fallback or offline-first behavior.
+- The project must review model/framework/dataset licenses before shipping
+  trained weights.
+
+---
+
+## ADR-019: Tiled ML training stays local until all gates pass
+
+**Date:** 2026-05-13
+
+**Status:** Accepted
+
+**Context:**
+Full-frame YOLO segmentation under-detected small holds in Heidelberg photos.
+Tiling preserves hold scale and improved recall, but tiled inference is slower
+and no-tap route selection is still not reliable on every held-out wall style.
+
+**Decision:**
+Add local-only tiled dataset preparation and stitched evaluation scripts for the
+ML route-mask pipeline. Keep the package/model-card step blocked unless the same
+checkpoint clears all quality and runtime gates. Adjust the no-tap color-route
+selector to penalize bright wall-like groups when choosing the default dominant
+hold color.
+
+**Consequences:**
+- The training pipeline can test small-hold recall without changing app
+  behavior.
+- Current tile-trained checkpoints remain unpromoted because held-out
+  evaluation still fails the runtime gate.
+- A future promoted model needs a faster exported tiled runtime; more labels can
+  still improve generalization across wall styles.
+- 2026-05-19 runtime follow-up: a `tiles1900-img768` fine-tune reached the
+  runtime gate on validation but failed all-hold recall, while batched and FP16
+  tiled inference kept quality but made p90 runtime worse on the RTX 3060 laptop
+  GPU. These controls remain available for reproducible experiments, but they
+  are not promotion evidence.
+- 2026-05-19 data follow-up: SAM3 can be used as an offline teacher to propose
+  hold masks for manual review and student distillation. SAM3 outputs are not
+  accepted as validation/test ground truth, and SAM3 is not added to app runtime.
+
+---
+
+## ADR-020: Local mask comparison drives route selection tuning
+
+**Date:** 2026-05-24
+
+**Status:** Accepted
+
+**Context:**
+The packaged model-card inference can segment many holds, but default no-tap
+route selection is still the main visible failure on local photo comparisons.
+Manual one-off screenshots are not enough to improve it safely.
+
+**Decision:**
+Keep the comparison workflow local-only and compare deterministic
+`generateRouteMask` output against packaged model-card inference on the same
+photo or manifest row. Record top model route groups with their scoring feature
+vectors so the route selector can be tuned against known masks without changing
+runtime app behavior. SAM-family models may be used locally as an edge teacher
+or proposal source for reviewed labels, but Crux's model remains responsible for
+hold detection, route grouping, and route selection.
+
+**Consequences:**
+- Route selection changes must be backed by batch metrics and comparable
+  overlays, not by isolated visual inspection.
+- SAM output can improve edge quality through reviewed labels or distillation
+  without becoming the product fallback.
+- The app remains offline-first and does not gain a runtime SAM dependency.
