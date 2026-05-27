@@ -1,5 +1,5 @@
 import { generateId } from '@crux/shared';
-import { generateMask, type HSL } from '@crux/vision';
+import { generateRouteMask, type HSL } from '@crux/vision';
 import { AlphaType, ColorType, ImageFormat, type SkImage, Skia } from '@shopify/react-native-skia';
 import * as FileSystem from 'expo-file-system';
 
@@ -53,7 +53,7 @@ export async function generateMaskFromPhoto(params: { uri: string; seedColor?: H
   method: 'auto' | 'seed-color';
 }> {
   const { pixels, width, height } = await readImagePixels(params.uri);
-  const result = generateMask({
+  const result = generateRouteMask({
     pixels,
     width,
     height,

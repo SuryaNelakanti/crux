@@ -130,6 +130,7 @@ export async function upsertRouteMasks(rows: RouteMask[]): Promise<void> {
     method: row.method,
     seed_color_json: row.seedColorJson,
     confidence: row.confidence,
+    metadata_json: row.metadataJson,
     created_by: row.createdBy,
     created_at: toIso(row.createdAt),
   }));

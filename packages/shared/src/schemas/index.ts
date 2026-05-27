@@ -17,7 +17,14 @@ export const AttemptsModeSchema = z.enum(['off', 'aggregate', 'per_attempt']);
 
 export const GradeScaleSchema = z.enum(['v_scale', 'font', 'custom']);
 
-export const MaskMethodSchema = z.enum(['auto', 'color-dominant', 'manual-edit', 'seed-color']);
+export const MaskMethodSchema = z.enum([
+  'auto',
+  'color-dominant',
+  'manual-edit',
+  'seed-color',
+  'ml-yolo26-seg',
+  'ml-combo-v1',
+]);
 
 export const MediaTypeSchema = z.enum(['photo', 'mask']);
 
@@ -107,6 +114,7 @@ export const RouteMaskSchema = z.object({
   method: MaskMethodSchema,
   seedColorJson: SeedColorSchema.nullable(),
   confidence: z.number().min(0).max(1).nullable(),
+  metadataJson: z.record(z.unknown()).nullable(),
   createdBy: z.string().uuid(),
   createdAt: z.coerce.date(),
 });
@@ -176,12 +184,15 @@ export const RouteMaskCreatedPayloadSchema = z.object({
   routeMaskId: z.string().uuid(),
   method: MaskMethodSchema,
   confidence: z.number().nullable(),
+  metadataJson: z.record(z.unknown()).nullable().optional(),
 });
 
 export const RouteMaskUpdatedPayloadSchema = z.object({
   problemId: z.string().uuid(),
   routeMaskId: z.string().uuid(),
   method: MaskMethodSchema,
+  confidence: z.number().nullable().optional(),
+  metadataJson: z.record(z.unknown()).nullable().optional(),
 });
 
 export const UserProblemLogUpsertedPayloadSchema = z.object({

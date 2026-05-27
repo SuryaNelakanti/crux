@@ -367,6 +367,37 @@ The previous K-means clustering approach for hold detection often failed on mult
 
 ---
 
+## ADR-016: Camera-first workflow migration
+
+**Date:** 2026-05-11
+
+**Status:** Accepted
+
+**Context:**
+The MVP invariant is photo -> auto-mask -> a few taps -> saved. The UI had
+started to expose journal, mask, and decorative brand elements with similar
+weight, which made the fastest capture path feel less direct.
+
+**Decision:**
+Reframe the mobile app around a camera-first workflow:
+- Sessions is a quiet launcher with active-session resume first.
+- Active Session is the cockpit: capture action, session counts, problem feed.
+- Camera is a focused capture tunnel with minimal chrome.
+- Problem detail is outcome-first: photo/mask, "what happened?", optional fields.
+- Mask Editor is a focused correction tool that saves new mask versions.
+
+The design direction is "Field Lab": restrained, photo-dominant, warm technical,
+and task-first. Organic doodles are reduced on core workflow screens so they do
+not compete with the wall photo or primary actions.
+
+**Consequences:**
+- The happy path is clearer: add problem, capture, tap outcome, save.
+- Secondary actions remain available without competing with capture.
+- Sharing, export, and settings can land as artifact/system actions instead of
+  interrupting the capture tunnel.
+
+---
+
 ## ADR-017: Dataset-driven vision benchmark
 
 **Date:** 2026-05-11

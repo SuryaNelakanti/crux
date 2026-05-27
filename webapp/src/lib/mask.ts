@@ -1,4 +1,4 @@
-import { generateMask, type HSL } from '@crux/vision';
+import { generateRouteMask, type HSL } from '@crux/vision';
 import { readImagePixels } from './image';
 
 const MASK_TINT = { r: 47, g: 191, b: 156, a: 235 };
@@ -20,7 +20,7 @@ export async function generateMaskFromPhoto(params: {
     uri: params.uri,
     maxWidth: params.maxWidth,
   });
-  const result = generateMask({
+  const result = generateRouteMask({
     pixels,
     width,
     height,

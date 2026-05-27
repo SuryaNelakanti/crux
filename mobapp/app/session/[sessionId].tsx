@@ -6,7 +6,6 @@ import { useTheme } from '@shopify/restyle';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, ScrollView } from 'react-native';
-import { DoodleWave } from '@/components/Doodle';
 import { ScreenReveal } from '@/components/ScreenReveal';
 import { getProblemCardsForSession, type ProblemCardItem } from '@/features/problem';
 import { endSession, getSessionById, type SessionSummary } from '@/features/session';
@@ -92,28 +91,33 @@ export default function SessionScreen() {
               <Box flexDirection="row" justifyContent="space-between" alignItems="center">
                 <Box gap="xs">
                   <Text variant="headingLarge" color="textPrimary">
-                    Session
+                    Active session
                   </Text>
                   <Text variant="bodySmall" color="textSecondary">
                     {session?.startTs ? formatRelativeTime(session.startTs) : sessionId}
                   </Text>
                 </Box>
-                <Box alignItems="flex-end" gap="xs">
-                  <Badge
-                    label={session?.endTs ? 'Ended' : 'Live'}
-                    variant={session?.endTs ? 'default' : 'brand'}
-                    size="small"
-                  />
-                  <DoodleWave width={80} height={20} color="accentBrand" />
-                </Box>
+                <Badge
+                  label={session?.endTs ? 'Ended' : 'Live'}
+                  variant={session?.endTs ? 'default' : 'brand'}
+                  size="small"
+                />
+              </Box>
+
+              <Button label="+ Problem" variant="primary" size="large" onPress={handleAddProblem} />
+
+              <Box flexDirection="row" gap="s" justifyContent="space-between">
+                <StatChip label="Problems" value={problems.length} accent="textPrimary" />
+                <StatChip label="Sends" value={sendCount} accent="statusSuccess" />
+                <StatChip label="Flashes" value={flashCount} accent="accentBrand" />
               </Box>
 
               <Box flexDirection="row" gap="s">
                 <Button
-                  label="+ Problem"
-                  variant="primary"
+                  label="Sync"
+                  variant="secondary"
                   size="medium"
-                  onPress={handleAddProblem}
+                  onPress={() => void runSync()}
                 />
                 <Button
                   label="End Session"
@@ -121,12 +125,6 @@ export default function SessionScreen() {
                   size="medium"
                   onPress={handleEndSession}
                 />
-              </Box>
-
-              <Box flexDirection="row" gap="s">
-                <StatChip label="Problems" value={problems.length} accent="textPrimary" />
-                <StatChip label="Sends" value={sendCount} accent="statusSuccess" />
-                <StatChip label="Flashes" value={flashCount} accent="accentBrand" />
               </Box>
             </Box>
           </ScreenReveal>
@@ -140,9 +138,14 @@ export default function SessionScreen() {
               </Card>
             ) : problems.length === 0 ? (
               <Card variant="outlined">
-                <Text variant="bodyMedium" color="textMuted">
-                  No problems yet. Add one.
-                </Text>
+                <Box gap="s">
+                  <Text variant="headingSmall" color="textPrimary">
+                    Ready to capture
+                  </Text>
+                  <Text variant="bodyMedium" color="textMuted">
+                    Add a problem, take the photo, tap the outcome, and move on.
+                  </Text>
+                </Box>
               </Card>
             ) : (
               <Box gap="m">

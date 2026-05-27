@@ -4,8 +4,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { CaptureButton } from '@/components/CaptureButton';
-import { DoodleWave, Sparkle } from '@/components/Doodle';
-import { ScreenReveal } from '@/components/ScreenReveal';
 import { generateAutoMaskForProblem } from '@/features/mask';
 import { createProblemFromPhoto } from '@/features/problem';
 import { processCapturedPhoto } from '@/lib/media';
@@ -133,60 +131,46 @@ export default function CameraScreen() {
       <CameraView ref={cameraRef} style={{ flex: 1 }} />
 
       <Box position="absolute" left={0} right={0} top={0} padding="m">
-        <ScreenReveal>
-          <Box
-            flexDirection="row"
-            justifyContent="space-between"
-            alignItems="center"
-            padding="m"
-            borderRadius="l"
-            backgroundColor="overlayMedium"
-          >
-            <Box gap="xs">
-              <Text variant="headingSmall" color="textInverse">
-                Frame the wall
-              </Text>
-              <Text variant="bodySmall" color="textInverse">
-                Auto mask will pick the dominant hold color
-              </Text>
-            </Box>
-            <Box alignItems="flex-end" gap="xs">
-              <Sparkle size={18} color="textInverse" />
-              <DoodleWave width={70} height={18} color="textInverse" />
-            </Box>
+        <Box
+          flexDirection="row"
+          justifyContent="space-between"
+          alignItems="center"
+          padding="m"
+          borderRadius="l"
+          backgroundColor="overlayMedium"
+        >
+          <Box gap="xs">
+            <Text variant="headingSmall" color="textInverse">
+              Frame the route
+            </Text>
+            <Text variant="bodySmall" color="textInverse">
+              Capture now, fix the mask only if needed.
+            </Text>
           </Box>
-        </ScreenReveal>
+          <Button label="Cancel" variant="ghost" size="small" onPress={() => router.back()} />
+        </Box>
       </Box>
 
       <Box position="absolute" left={0} right={0} bottom={0} padding="l">
-        <ScreenReveal delay={120}>
-          <Box
-            alignItems="center"
-            gap="s"
-            padding="m"
-            borderRadius="l"
-            backgroundColor="overlayHeavy"
-          >
-            <CaptureButton onPress={handleCapture} disabled={processing} />
-            <Text variant="labelMedium" color="textInverse">
-              {processing ? 'Processing...' : 'Capture problem'}
-            </Text>
-            <Button
-              label={uploading ? 'Uploading...' : 'Upload Photo'}
-              variant="secondary"
-              size="small"
-              onPress={handleUpload}
-              disabled={processing || uploading}
-            />
-            <Button
-              label="Cancel"
-              variant="ghost"
-              size="small"
-              onPress={() => router.back()}
-              disabled={processing || uploading}
-            />
-          </Box>
-        </ScreenReveal>
+        <Box
+          alignItems="center"
+          gap="s"
+          padding="m"
+          borderRadius="l"
+          backgroundColor="overlayHeavy"
+        >
+          <CaptureButton onPress={handleCapture} disabled={processing} />
+          <Text variant="labelMedium" color="textInverse">
+            {processing ? 'Processing...' : 'Capture problem'}
+          </Text>
+          <Button
+            label={uploading ? 'Uploading...' : 'Upload Photo'}
+            variant="secondary"
+            size="small"
+            onPress={handleUpload}
+            disabled={processing || uploading}
+          />
+        </Box>
       </Box>
     </Box>
   );

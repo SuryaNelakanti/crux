@@ -3,13 +3,14 @@ import {
   AUTO_MASK_CONFIDENCE_THRESHOLD,
   formatGradeRange,
   generateId,
+  type MaskMethod,
   type Outcome,
 } from '@crux/shared';
-import { type HSL } from '@crux/vision';
 import { insertEvents, uploadMask, uploadPhoto } from '@crux/supabase-client';
+import type { HSL } from '@crux/vision';
+import { buildRouteMaskForCluster, detectHoldsFromPhoto, pickBestCluster } from './holds';
 import { preparePhotoForUpload } from './image';
 import { buildMaskRgba, generateMaskFromPhoto, rgbaToBlob } from './mask';
-import { buildRouteMaskForCluster, detectHoldsFromPhoto, pickBestCluster } from './holds';
 import { getSupabaseClient } from './supabase';
 
 export interface SessionSummary {
@@ -128,7 +129,9 @@ const computeRouteConfidence = (mask: Uint8Array, holdScores: number[]): number 
   const coverageScore =
     coverage < 0.005 || coverage > 0.5 ? 0 : 1 - Math.abs(coverage - 0.12) / 0.38;
   const avgHoldScore =
-    holdScores.length === 0 ? 0 : holdScores.reduce((sum, score) => sum + score, 0) / holdScores.length;
+    holdScores.length === 0
+      ? 0
+      : holdScores.reduce((sum, score) => sum + score, 0) / holdScores.length;
   return Math.min(1, Math.max(0, avgHoldScore * 0.7 + coverageScore * 0.3));
 };
 
@@ -317,9 +320,7 @@ export async function fetchProblemsForSession(sessionId: string): Promise<Proble
 
       return {
         problemId: problem.id,
-        imageUrl: primaryMedia?.storage_path
-          ? await getSignedUrl(primaryMedia.storage_path)
-          : null,
+        imageUrl: primaryMedia?.storage_path ? await getSignedUrl(primaryMedia.storage_path) : null,
         maskUrl: maskMedia?.storage_path ? await getSignedUrl(maskMedia.storage_path) : null,
         outcome: log?.outcome ?? null,
         gradeLabel,
@@ -371,12 +372,12 @@ export async function fetchProblemDetail(problemId: string): Promise<ProblemDeta
     maskMethod: mask?.method ?? null,
     log: log
       ? {
-        outcome: log.outcome,
-        attemptsCount: log.attempts_count,
-        gradeMin: log.grade_min,
-        gradeMax: log.grade_max,
-        note: log.note,
-      }
+          outcome: log.outcome,
+          attemptsCount: log.attempts_count,
+          gradeMin: log.grade_min,
+          gradeMax: log.grade_max,
+          note: log.note,
+        }
       : null,
     media: {
       width: photo?.width ?? null,
@@ -604,9 +605,10 @@ export async function saveMaskVersion(params: {
   mask: Uint8Array;
   width: number;
   height: number;
-  method?: 'auto' | 'seed-color' | 'manual-edit' | 'color-dominant';
+  method?: MaskMethod;
   seedColor?: HSL | null;
   confidence?: number | null;
+  metadataJson?: Record<string, unknown> | null;
 }): Promise<string> {
   const client = getSupabaseClient();
   const user = await getAuthUser();
@@ -654,6 +656,7 @@ export async function saveMaskVersion(params: {
     method,
     seed_color_json: seedColor,
     confidence,
+    metadata_json: params.metadataJson ?? null,
     created_by: user.id,
     created_at: now.toISOString(),
   });
@@ -677,6 +680,7 @@ export async function saveMaskVersion(params: {
         routeMaskId,
         method,
         confidence,
+        metadataJson: params.metadataJson ?? null,
       },
     }),
   ]);

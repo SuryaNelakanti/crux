@@ -6,7 +6,6 @@ import { useTheme } from '@shopify/restyle';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView } from 'react-native';
-import { DoodleWave, Sparkle } from '@/components/Doodle';
 import { ScreenReveal } from '@/components/ScreenReveal';
 import {
   createBlankMaskForProblem,
@@ -163,26 +162,27 @@ export default function ProblemDetailScreen() {
             <Box gap="m">
               <Box flexDirection="row" justifyContent="space-between" alignItems="center">
                 <Button label="Back" variant="ghost" size="small" onPress={() => router.back()} />
-                <Box flexDirection="row" gap="xs" alignItems="center">
-                  <Sparkle size={18} color="accentBrand" />
-                  <DoodleWave width={70} height={18} color="accentBrand" />
-                </Box>
+                <Badge
+                  label={sessionId ? 'In session' : 'Problem'}
+                  variant="default"
+                  size="small"
+                />
               </Box>
 
-              <Card variant="outlined" padding="none">
-                {imageUri ? (
-                  <ProblemCard
-                    imageSource={{ uri: imageUri }}
-                    maskSource={maskUri ? { uri: maskUri } : undefined}
-                    showMask={maskView === 'mask'}
-                    outcome={outcome}
-                  />
-                ) : (
+              {imageUri ? (
+                <ProblemCard
+                  imageSource={{ uri: imageUri }}
+                  maskSource={maskUri ? { uri: maskUri } : undefined}
+                  showMask={maskView === 'mask'}
+                  outcome={outcome}
+                />
+              ) : (
+                <Card variant="outlined">
                   <Text variant="bodyMedium" color="textMuted">
                     Photo unavailable
                   </Text>
-                )}
-              </Card>
+                </Card>
+              )}
 
               {maskUri ? (
                 <Box gap="s">
@@ -252,7 +252,7 @@ export default function ProblemDetailScreen() {
                 {maskConfidence !== null && maskConfidence < AUTO_MASK_CONFIDENCE_THRESHOLD && (
                   <Card variant="outlined">
                     <Text variant="bodyMedium" color="textMuted">
-                      Mask confidence is low. Quick edits usually fix it.
+                      Low confidence. Edit only if the overlay misses the route.
                     </Text>
                   </Card>
                 )}
@@ -263,7 +263,7 @@ export default function ProblemDetailScreen() {
           <ScreenReveal delay={120}>
             <Box gap="m">
               <Text variant="headingSmall" color="textPrimary">
-                Log outcome
+                What happened?
               </Text>
               <SegmentedControl<Outcome>
                 options={[...OUTCOME_OPTIONS]}
@@ -275,7 +275,7 @@ export default function ProblemDetailScreen() {
 
           <ScreenReveal delay={180}>
             <Box gap="m">
-              <Text variant="headingSmall" color="textPrimary">
+              <Text variant="labelLarge" color="textSecondary">
                 Attempts
               </Text>
               <TextField
@@ -290,8 +290,8 @@ export default function ProblemDetailScreen() {
 
           <ScreenReveal delay={220}>
             <Box gap="m">
-              <Text variant="headingSmall" color="textPrimary">
-                Grade range (V-scale)
+              <Text variant="labelLarge" color="textSecondary">
+                Grade range
               </Text>
               <Box flexDirection="row" gap="m">
                 <Box flex={1}>
@@ -318,7 +318,7 @@ export default function ProblemDetailScreen() {
 
           <ScreenReveal delay={260}>
             <Box gap="m">
-              <Text variant="headingSmall" color="textPrimary">
+              <Text variant="labelLarge" color="textSecondary">
                 Note
               </Text>
               <TextField

@@ -12,6 +12,7 @@ export async function createRouteMask(params: {
   method: MaskMethod;
   seedColorJson: { h: number; s: number; l: number } | null;
   confidence: number | null;
+  metadataJson?: Record<string, unknown> | null;
 }): Promise<{ routeMaskId: string; mediaId: string; version: number }> {
   const { db, localUserId } = await initDb();
   const now = new Date();
@@ -44,8 +45,8 @@ export async function createRouteMask(params: {
   await db.runAsync(
     `
         insert into route_masks (
-            id, problem_id, version, mask_media_id, method, seed_color_json, confidence, created_by, created_at
-        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            id, problem_id, version, mask_media_id, method, seed_color_json, confidence, metadata_json, created_by, created_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
     [
       routeMaskId,
@@ -55,6 +56,7 @@ export async function createRouteMask(params: {
       params.method,
       params.seedColorJson ? JSON.stringify(params.seedColorJson) : null,
       params.confidence,
+      params.metadataJson ? JSON.stringify(params.metadataJson) : null,
       localUserId,
       now.toISOString(),
     ]
@@ -90,11 +92,14 @@ export async function createRouteMask(params: {
             routeMaskId,
             method: params.method,
             confidence: params.confidence,
+            metadataJson: params.metadataJson ?? null,
           }
         : {
             problemId: params.problemId,
             routeMaskId,
             method: params.method,
+            confidence: params.confidence,
+            metadataJson: params.metadataJson ?? null,
           },
   });
 
@@ -109,6 +114,7 @@ export async function getActiveRouteMaskForProblem(problemId: string): Promise<{
   method: MaskMethod;
   seedColorJson: { h: number; s: number; l: number } | null;
   confidence: number | null;
+  metadataJson: Record<string, unknown> | null;
   createdBy: string;
   createdAt: Date;
   localPath: string | null;
@@ -122,6 +128,7 @@ export async function getActiveRouteMaskForProblem(problemId: string): Promise<{
     method: MaskMethod;
     seed_color_json: string | null;
     confidence: number | null;
+    metadata_json: string | null;
     created_by: string;
     created_at: string;
     local_path: string | null;
@@ -148,6 +155,7 @@ export async function getActiveRouteMaskForProblem(problemId: string): Promise<{
     method: row.method,
     seedColorJson: parseJson(row.seed_color_json, null),
     confidence: row.confidence,
+    metadataJson: parseJson(row.metadata_json, null),
     createdBy: row.created_by,
     createdAt: new Date(row.created_at),
     localPath: row.local_path,

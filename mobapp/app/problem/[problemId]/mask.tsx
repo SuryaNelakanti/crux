@@ -13,7 +13,6 @@ import { useTheme } from '@shopify/restyle';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, ScrollView } from 'react-native';
-import { DoodleWave, Sparkle } from '@/components/Doodle';
 import { ScreenReveal } from '@/components/ScreenReveal';
 import {
   applyBrushToMask,
@@ -216,10 +215,7 @@ export default function MaskEditorScreen() {
           <ScreenReveal>
             <Box flexDirection="row" justifyContent="space-between" alignItems="center">
               <Button label="Back" variant="ghost" size="small" onPress={() => router.back()} />
-              <Box flexDirection="row" alignItems="center" gap="xs">
-                <Sparkle size={18} color="accentBrand" />
-                <DoodleWave width={70} height={18} color="accentBrand" />
-              </Box>
+              <Badge label="Mask editor" variant="brand" size="small" />
               <Button
                 label={saving ? 'Saving...' : 'Save'}
                 variant="primary"
@@ -231,20 +227,14 @@ export default function MaskEditorScreen() {
           </ScreenReveal>
 
           <ScreenReveal delay={120}>
-            <Card variant="outlined">
-              <Box gap="s">
-                <Text variant="headingSmall" color="textPrimary">
-                  Edit mask
-                </Text>
-                <Text variant="bodySmall" color="textSecondary">
-                  Paint to add or erase holds. Saving creates a new version.
-                </Text>
-                <Box flexDirection="row" gap="s">
-                  <Badge label="Brush" variant="brand" size="small" />
-                  <Badge label="Versioned" variant="info" size="small" />
-                </Box>
-              </Box>
-            </Card>
+            <Box gap="xs">
+              <Text variant="headingSmall" color="textPrimary">
+                Fix the overlay
+              </Text>
+              <Text variant="bodySmall" color="textSecondary">
+                Brush add or erase, then save a new version.
+              </Text>
+            </Box>
           </ScreenReveal>
 
           <ScreenReveal delay={180}>

@@ -65,9 +65,10 @@ create table if not exists public.route_masks (
     problem_id uuid not null references public.problems (id) on delete cascade,
     version integer not null,
     mask_media_id uuid not null references public.media (id) on delete cascade,
-    method text not null check (method in ('auto', 'color-dominant', 'manual-edit', 'seed-color')),
+    method text not null check (method in ('auto', 'color-dominant', 'manual-edit', 'seed-color', 'ml-yolo26-seg', 'ml-combo-v1')),
     seed_color_json jsonb,
     confidence numeric,
+    metadata_json jsonb,
     created_by uuid not null references public.users (id) on delete cascade,
     created_at timestamptz not null default now(),
     unique (problem_id, version)

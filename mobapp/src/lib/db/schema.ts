@@ -70,6 +70,7 @@ create table if not exists route_masks (
     method text not null,
     seed_color_json text,
     confidence real,
+    metadata_json text,
     created_by text not null,
     created_at text not null
 );
@@ -172,12 +173,20 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   return dbPromise;
 }
 
+async function ensureRouteMaskMetadataColumn(db: SQLite.SQLiteDatabase): Promise<void> {
+  const columns = await db.getAllAsync<{ name: string }>('pragma table_info(route_masks)');
+  if (!columns.some((column) => column.name === 'metadata_json')) {
+    await db.runAsync('alter table route_masks add column metadata_json text');
+  }
+}
+
 export async function initDb(): Promise<{
   db: SQLite.SQLiteDatabase;
   localUserId: string;
 }> {
   const db = await getDb();
   await db.execAsync(SCHEMA_SQL);
+  await ensureRouteMaskMetadataColumn(db);
 
   const existingState = await db.getFirstAsync<{ local_user_id: string | null }>(
     'select local_user_id from sync_state where id = 1'

@@ -6,7 +6,6 @@ import { useTheme } from '@shopify/restyle';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView } from 'react-native';
-import { DoodleWave, Sparkle } from '@/components/Doodle';
 import { ScreenReveal } from '@/components/ScreenReveal';
 import { createSession, getSessionSummaries, type SessionSummary } from '@/features/session';
 
@@ -40,6 +39,8 @@ export default function HomeScreen() {
     router.push(`/session/${session.id}`);
   };
 
+  const activeSession = sessions.find((session) => !session.endTs) ?? null;
+
   return (
     <Box flex={1} backgroundColor="bgCanvas">
       <ScrollView
@@ -50,43 +51,65 @@ export default function HomeScreen() {
       >
         <Box gap="xl">
           <ScreenReveal>
-            <Box gap="l">
-              <Box flexDirection="row" justifyContent="space-between" alignItems="center">
-                <Box gap="xs">
-                  <Text variant="displaySmall" color="textPrimary">
-                    Crux
-                  </Text>
-                  <Text variant="bodyMedium" color="textSecondary">
-                    Photo-first bouldering journal
-                  </Text>
-                </Box>
-                <Box alignItems="flex-end" gap="xs">
-                  <Sparkle size={20} color="accentBrand" />
-                  <DoodleWave width={90} height={24} color="accentBrand" />
-                </Box>
-              </Box>
-
-              <Card variant="elevated">
-                <Box gap="m">
-                  <Text variant="headingSmall" color="textPrimary">
-                    Start a session
-                  </Text>
-                  <Text variant="bodyMedium" color="textSecondary">
-                    Capture problems in under 15 seconds. Offline ready.
-                  </Text>
-                  <Button
-                    label="Start Session"
-                    variant="primary"
-                    size="large"
-                    onPress={handleStartSession}
-                  />
-                  <Box flexDirection="row" gap="s" flexWrap="wrap">
-                    <Badge label="Offline" variant="brand" size="small" />
-                    <Badge label="Auto mask" variant="info" size="small" />
-                    <Badge label="Shareable" variant="default" size="small" />
+            <Box gap="m">
+              <Text variant="displaySmall" color="textPrimary">
+                Crux
+              </Text>
+              <Text variant="bodyMedium" color="textSecondary">
+                Camera-first bouldering log
+              </Text>
+              {activeSession ? (
+                <Card
+                  variant="elevated"
+                  pressable
+                  padding="none"
+                  onPress={() => router.push(`/session/${activeSession.id}`)}
+                >
+                  <Box padding="m" gap="m">
+                    <Box flexDirection="row" justifyContent="space-between" alignItems="center">
+                      <Box gap="2xs">
+                        <Text variant="headingSmall" color="textPrimary">
+                          Active session
+                        </Text>
+                        <Text variant="bodySmall" color="textMuted">
+                          {formatRelativeTime(activeSession.startTs)}
+                        </Text>
+                      </Box>
+                      <Badge label="Live" variant="brand" size="small" />
+                    </Box>
+                    <Box flexDirection="row" gap="s">
+                      <StatChip
+                        label="Problems"
+                        value={activeSession.problemCount}
+                        accent="textPrimary"
+                      />
+                      <StatChip
+                        label="Sends"
+                        value={activeSession.sendCount}
+                        accent="statusSuccess"
+                      />
+                      <StatChip
+                        label="Flashes"
+                        value={activeSession.flashCount}
+                        accent="accentBrand"
+                      />
+                    </Box>
+                    <Button
+                      label="Resume Session"
+                      variant="primary"
+                      size="large"
+                      onPress={() => router.push(`/session/${activeSession.id}`)}
+                    />
                   </Box>
-                </Box>
-              </Card>
+                </Card>
+              ) : (
+                <Button
+                  label="Start Session"
+                  variant="primary"
+                  size="large"
+                  onPress={handleStartSession}
+                />
+              )}
             </Box>
           </ScreenReveal>
 
@@ -94,7 +117,7 @@ export default function HomeScreen() {
             <Box gap="m">
               <Box flexDirection="row" justifyContent="space-between" alignItems="center">
                 <Text variant="headingSmall" color="textPrimary">
-                  Recent sessions
+                  Previous sessions
                 </Text>
                 <Button
                   label="Design System"
@@ -112,68 +135,70 @@ export default function HomeScreen() {
                     </Text>
                   </Box>
                 </Card>
-              ) : sessions.length === 0 ? (
+              ) : sessions.filter((session) => session.id !== activeSession?.id).length === 0 ? (
                 <Card variant="outlined">
                   <Box alignItems="center" paddingVertical="l" gap="xs">
                     <Text variant="bodyMedium" color="textMuted">
-                      No sessions yet
+                      No previous sessions
                     </Text>
                     <Text variant="bodySmall" color="textMuted">
-                      Start your first climbing session
+                      Finished sessions will appear here.
                     </Text>
                   </Box>
                 </Card>
               ) : (
                 <Box gap="m">
-                  {sessions.map((session) => {
-                    const duration = session.endTs
-                      ? formatDuration(session.startTs.getTime(), session.endTs.getTime())
-                      : 'Live';
-                    return (
-                      <Card
-                        key={session.id}
-                        variant="outlined"
-                        pressable
-                        padding="none"
-                        onPress={() => router.push(`/session/${session.id}`)}
-                      >
-                        <Box padding="m" gap="s">
-                          <Box flexDirection="row" justifyContent="space-between">
-                            <Box gap="2xs">
-                              <Text variant="labelLarge" color="textPrimary">
-                                {session.startTs.toLocaleDateString()}
-                              </Text>
-                              <Text variant="bodySmall" color="textMuted">
-                                {formatRelativeTime(session.startTs)} - {duration}
-                              </Text>
+                  {sessions
+                    .filter((session) => session.id !== activeSession?.id)
+                    .map((session) => {
+                      const duration = session.endTs
+                        ? formatDuration(session.startTs.getTime(), session.endTs.getTime())
+                        : 'Live';
+                      return (
+                        <Card
+                          key={session.id}
+                          variant="outlined"
+                          pressable
+                          padding="none"
+                          onPress={() => router.push(`/session/${session.id}`)}
+                        >
+                          <Box padding="m" gap="s">
+                            <Box flexDirection="row" justifyContent="space-between">
+                              <Box gap="2xs">
+                                <Text variant="labelLarge" color="textPrimary">
+                                  {session.startTs.toLocaleDateString()}
+                                </Text>
+                                <Text variant="bodySmall" color="textMuted">
+                                  {formatRelativeTime(session.startTs)} - {duration}
+                                </Text>
+                              </Box>
+                              {session.endTs ? (
+                                <Badge label="Ended" variant="default" size="small" />
+                              ) : (
+                                <Badge label="Live" variant="brand" size="small" />
+                              )}
                             </Box>
-                            {session.endTs ? (
-                              <Badge label="Ended" variant="default" size="small" />
-                            ) : (
-                              <Badge label="Live" variant="brand" size="small" />
-                            )}
+                            <Box flexDirection="row" gap="s">
+                              <StatChip
+                                label="Problems"
+                                value={session.problemCount}
+                                accent="textPrimary"
+                              />
+                              <StatChip
+                                label="Sends"
+                                value={session.sendCount}
+                                accent="statusSuccess"
+                              />
+                              <StatChip
+                                label="Flashes"
+                                value={session.flashCount}
+                                accent="accentBrand"
+                              />
+                            </Box>
                           </Box>
-                          <Box flexDirection="row" gap="s">
-                            <StatChip
-                              label="Problems"
-                              value={session.problemCount}
-                              accent="textPrimary"
-                            />
-                            <StatChip
-                              label="Sends"
-                              value={session.sendCount}
-                              accent="statusSuccess"
-                            />
-                            <StatChip
-                              label="Flashes"
-                              value={session.flashCount}
-                              accent="accentBrand"
-                            />
-                          </Box>
-                        </Box>
-                      </Card>
-                    );
-                  })}
+                        </Card>
+                      );
+                    })}
                 </Box>
               )}
             </Box>

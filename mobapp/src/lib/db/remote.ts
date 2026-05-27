@@ -85,8 +85,8 @@ export async function upsertRemoteRouteMasks(rows: RouteMask[]): Promise<void> {
     await db.runAsync(
       `
             insert into route_masks (
-                id, problem_id, version, mask_media_id, method, seed_color_json, confidence, created_by, created_at
-            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id, problem_id, version, mask_media_id, method, seed_color_json, confidence, metadata_json, created_by, created_at
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             on conflict (id) do update set
                 problem_id = excluded.problem_id,
                 version = excluded.version,
@@ -94,6 +94,7 @@ export async function upsertRemoteRouteMasks(rows: RouteMask[]): Promise<void> {
                 method = excluded.method,
                 seed_color_json = excluded.seed_color_json,
                 confidence = excluded.confidence,
+                metadata_json = excluded.metadata_json,
                 created_by = excluded.created_by,
                 created_at = excluded.created_at
             `,
@@ -105,6 +106,7 @@ export async function upsertRemoteRouteMasks(rows: RouteMask[]): Promise<void> {
         mask.method,
         mask.seedColorJson ? JSON.stringify(mask.seedColorJson) : null,
         mask.confidence,
+        mask.metadataJson ? JSON.stringify(mask.metadataJson) : null,
         mask.createdBy,
         mask.createdAt.toISOString(),
       ]

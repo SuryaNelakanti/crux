@@ -36,6 +36,16 @@ export {
   rgbToLab,
 } from './color';
 export {
+  type ComboRouteMaskMetadata,
+  type ComboRouteMaskMethod,
+  type ComboRouteMaskResult,
+  comboRouteMaskMetadataFromResult,
+  type RouteCandidate,
+  type SamMaskProposal,
+  type ScoredHoldProposal,
+  scoreRouteCandidateConfidence,
+} from './combo';
+export {
   getRouteLabel,
   parseViaAnnotations,
   type ViaImageAnnotation,

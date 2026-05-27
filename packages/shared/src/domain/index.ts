@@ -15,7 +15,13 @@ export type AttemptsMode = 'off' | 'aggregate' | 'per_attempt';
 
 export type GradeScale = 'v_scale' | 'font' | 'custom';
 
-export type MaskMethod = 'auto' | 'color-dominant' | 'manual-edit' | 'seed-color';
+export type MaskMethod =
+  | 'auto'
+  | 'color-dominant'
+  | 'manual-edit'
+  | 'seed-color'
+  | 'ml-yolo26-seg'
+  | 'ml-combo-v1';
 
 export type MediaType = 'photo' | 'mask';
 
@@ -108,6 +114,7 @@ export interface RouteMask {
   method: MaskMethod;
   seedColorJson: { h: number; s: number; l: number } | null;
   confidence: number | null;
+  metadataJson: Record<string, unknown> | null;
   createdBy: string;
   createdAt: Date;
 }

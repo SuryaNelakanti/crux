@@ -80,6 +80,7 @@ interface RouteMaskRow {
   method: string;
   seed_color_json: Record<string, unknown> | null;
   confidence: number | null;
+  metadata_json: Record<string, unknown> | null;
   created_by: string;
   created_at: string;
 }
@@ -256,6 +257,7 @@ async function pullRemoteUpdates(currentUserId: string): Promise<void> {
     method: row.method as import('@crux/shared').MaskMethod,
     seedColorJson: row.seed_color_json as { h: number; s: number; l: number } | null,
     confidence: row.confidence,
+    metadataJson: row.metadata_json,
     createdBy: row.created_by,
     createdAt: new Date(row.created_at),
   }));

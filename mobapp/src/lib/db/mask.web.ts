@@ -10,6 +10,7 @@ export async function createRouteMask(params: {
   method: MaskMethod;
   seedColorJson: { h: number; s: number; l: number } | null;
   confidence: number | null;
+  metadataJson?: Record<string, unknown> | null;
 }): Promise<{ routeMaskId: string; mediaId: string; version: number }> {
   const now = new Date();
   const version =
@@ -46,6 +47,7 @@ export async function createRouteMask(params: {
     method: params.method,
     seedColorJson: params.seedColorJson,
     confidence: params.confidence,
+    metadataJson: params.metadataJson ?? null,
     createdBy: 'web-user-id',
     createdAt: now,
   });
@@ -61,6 +63,7 @@ export async function getActiveRouteMaskForProblem(problemId: string): Promise<{
   method: MaskMethod;
   seedColorJson: { h: number; s: number; l: number } | null;
   confidence: number | null;
+  metadataJson: Record<string, unknown> | null;
   createdBy: string;
   createdAt: Date;
   localPath: string | null;

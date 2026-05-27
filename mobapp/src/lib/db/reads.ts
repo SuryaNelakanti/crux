@@ -115,9 +115,10 @@ export async function getAllRouteMasks(): Promise<RouteMask[]> {
     problem_id: string;
     version: number;
     mask_media_id: string;
-    method: 'auto' | 'color-dominant' | 'manual-edit' | 'seed-color';
+    method: RouteMask['method'];
     seed_color_json: string | null;
     confidence: number | null;
+    metadata_json: string | null;
     created_by: string;
     created_at: string;
   }>('select * from route_masks');
@@ -129,6 +130,7 @@ export async function getAllRouteMasks(): Promise<RouteMask[]> {
     method: row.method,
     seedColorJson: parseJson(row.seed_color_json, null),
     confidence: row.confidence,
+    metadataJson: parseJson(row.metadata_json, null),
     createdBy: row.created_by,
     createdAt: new Date(row.created_at),
   }));
