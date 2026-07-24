@@ -12,6 +12,8 @@
 
 // Constants
 export * from './constants';
+// Generated Supabase schema
+export * from './database.types';
 // Domain types
 export * from './domain';
 // Zod schemas

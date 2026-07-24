@@ -66,3 +66,9 @@
 
 ## QA Signal
 - A documented repro path in `docs/repro.md` for web.
+
+## 2026-07-24 Flow Update
+
+The web MVP is centered on **Log a climb** rather than a session dashboard. From Home, Log a climb reuses an active session when one exists or starts a new session, opens capture, uploads the photo, generates the automatic heuristic route mask, and lands on the captured-photo outcome screen. Flash, Sent, or Tried save immediately through the append-only event path and return to the active session. There is no default outcome and no separate Save step for the core flow.
+
+Mask correction is named **Fix route** and is progressively disclosed by low confidence or explicit user request. Attempts, grade, and notes are optional details below the outcome controls.

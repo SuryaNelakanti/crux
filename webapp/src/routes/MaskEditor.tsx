@@ -5,16 +5,12 @@ import { DoodleScribble } from '@/components/Doodle';
 import { Button, Segmented } from '@/components/ui';
 import { fetchProblemDetail, saveMaskVersion } from '@/lib/api';
 import {
-  applyBrushToMask,
-  loadMaskPixelsFromUrl,
-  maskTint,
-} from '@/lib/mask';
-import {
   buildRouteMaskForCluster,
   buildRouteMaskForHoldColor,
   detectHoldsFromPhoto,
   pickBestCluster,
 } from '@/lib/holds';
+import { applyBrushToMask, loadMaskPixelsFromUrl, maskTint } from '@/lib/mask';
 
 type BrushSize = 'S' | 'M' | 'L';
 type HoldDetection = Awaited<ReturnType<typeof detectHoldsFromPhoto>>;
@@ -48,7 +44,13 @@ export function MaskEditorRoute() {
 
   const getContainTransform = (containerWidth: number, containerHeight: number) => {
     if (!maskSize) {
-      return { scale: 1, drawWidth: containerWidth, drawHeight: containerHeight, offsetX: 0, offsetY: 0 };
+      return {
+        scale: 1,
+        drawWidth: containerWidth,
+        drawHeight: containerHeight,
+        offsetX: 0,
+        offsetY: 0,
+      };
     }
     const scale = Math.min(containerWidth / maskSize.width, containerHeight / maskSize.height);
     const drawWidth = maskSize.width * scale;
@@ -61,7 +63,10 @@ export function MaskEditorRoute() {
   const mapPointerToMask = (clientX: number, clientY: number) => {
     if (!canvasRef.current || !maskSize) return null;
     const rect = canvasRef.current.getBoundingClientRect();
-    const { scale, drawWidth, drawHeight, offsetX, offsetY } = getContainTransform(rect.width, rect.height);
+    const { scale, drawWidth, drawHeight, offsetX, offsetY } = getContainTransform(
+      rect.width,
+      rect.height
+    );
     const imageLeft = rect.left - offsetX;
     const imageTop = rect.top - offsetY;
     if (
@@ -208,6 +213,7 @@ export function MaskEditorRoute() {
     return outlines;
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Local helpers are recreated but derive only from holdDetection.
   const holdOutlines = useMemo(() => {
     if (!holdDetection) return new Map<number, Point[]>();
     return buildHoldOutlines(holdDetection);
@@ -322,7 +328,10 @@ export function MaskEditorRoute() {
       );
       offCtx.putImageData(imageData, 0, 0);
 
-      const { drawWidth, drawHeight, offsetX, offsetY } = getContainTransform(rect.width, rect.height);
+      const { drawWidth, drawHeight, offsetX, offsetY } = getContainTransform(
+        rect.width,
+        rect.height
+      );
       ctx.drawImage(offscreen, -offsetX, -offsetY, drawWidth, drawHeight);
     }
     if (holdDetection) {
@@ -382,10 +391,12 @@ export function MaskEditorRoute() {
   }, [problemId]);
 
   // Draw mask to canvas
+  // biome-ignore lint/correctness/useExhaustiveDependencies: renderMaskOverlay reads the listed canvas state.
   useEffect(() => {
     renderMaskOverlay();
   }, [rgbaData, maskSize, holdDetection, maskData, tool]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resize only needs the latest rendered mask state.
   useEffect(() => {
     const handleResize = () => renderMaskOverlay();
     window.addEventListener('resize', handleResize);
@@ -466,10 +477,10 @@ export function MaskEditorRoute() {
     setMaskMeta({ method: 'auto', seedColor: undefined, confidence: null });
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: buildHoldOverlay is a pure local renderer.
   useEffect(() => {
     if (!holdDetection) return;
-    const routeMask =
-      maskData ?? new Uint8Array(holdDetection.width * holdDetection.height);
+    const routeMask = maskData ?? new Uint8Array(holdDetection.width * holdDetection.height);
     if (!maskData) setMaskData(routeMask);
     setRgbaData(buildHoldOverlay(holdDetection, routeMask));
   }, [holdDetection, maskData, tool]);
@@ -623,8 +634,8 @@ export function MaskEditorRoute() {
         width: maskSize.width,
         height: maskSize.height,
         method,
-        seedColor: method === 'manual-edit' ? null : maskMeta.seedColor ?? null,
-        confidence: method === 'manual-edit' ? null : maskMeta.confidence ?? null,
+        seedColor: method === 'manual-edit' ? null : (maskMeta.seedColor ?? null),
+        confidence: method === 'manual-edit' ? null : (maskMeta.confidence ?? null),
       });
       navigate(`/problem/${problemId}`);
     } finally {
@@ -678,13 +689,7 @@ export function MaskEditorRoute() {
       </header>
 
       <div className="mask-canvas">
-        {photoUrl && (
-          <img
-            src={photoUrl}
-            alt="Problem"
-            className="mask-photo"
-          />
-        )}
+        {photoUrl && <img src={photoUrl} alt="Problem" className="mask-photo" />}
         <canvas
           ref={canvasRef}
           className="mask-overlay"
@@ -750,5 +755,3 @@ async function loadImageDimensions(url: string): Promise<{ width: number; height
     img.src = url;
   });
 }
-
-

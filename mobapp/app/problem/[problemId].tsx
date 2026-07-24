@@ -16,9 +16,8 @@ import { getProblemById, getUserProblemLog, upsertUserProblemLog } from '@/featu
 
 const OUTCOME_OPTIONS = [
   { value: 'flash', label: 'Flash' },
-  { value: 'send', label: 'Send' },
+  { value: 'send', label: 'Sent' },
   { value: 'tried', label: 'Tried' },
-  { value: 'project', label: 'Project' },
 ] as const;
 
 const MASK_VIEW_OPTIONS = [
@@ -38,7 +37,7 @@ export default function ProblemDetailScreen() {
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [maskBusy, setMaskBusy] = useState(false);
   const [maskError, setMaskError] = useState<string | null>(null);
-  const [outcome, setOutcome] = useState<Outcome>('tried');
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [attempts, setAttempts] = useState('');
   const [gradeMin, setGradeMin] = useState('');
   const [gradeMax, setGradeMax] = useState('');
@@ -86,8 +85,8 @@ export default function ProblemDetailScreen() {
     }, [problemId])
   );
 
-  const handleSave = async () => {
-    if (!problemId || !sessionId) return;
+  const handleSave = async (selectedOutcome = outcome, returnToSession = true) => {
+    if (!problemId || !sessionId || !selectedOutcome) return;
     setSaving(true);
     const attemptsCount = attempts ? Number(attempts) : null;
     const gradeMinValue = gradeMin ? Number(gradeMin) : null;
@@ -96,14 +95,14 @@ export default function ProblemDetailScreen() {
     await upsertUserProblemLog({
       problemId,
       sessionId,
-      outcome,
+      outcome: selectedOutcome,
       attemptsCount: Number.isNaN(attemptsCount) ? null : attemptsCount,
       gradeMin: Number.isNaN(gradeMinValue) ? null : gradeMinValue,
       gradeMax: Number.isNaN(gradeMaxValue) ? null : gradeMaxValue,
       note: note.trim() === '' ? null : note.trim(),
     });
     setSaving(false);
-    router.back();
+    if (returnToSession) router.replace(`/session/${sessionId}`);
   };
 
   const handleRetryMask = async () => {
@@ -174,7 +173,7 @@ export default function ProblemDetailScreen() {
                   imageSource={{ uri: imageUri }}
                   maskSource={maskUri ? { uri: maskUri } : undefined}
                   showMask={maskView === 'mask'}
-                  outcome={outcome}
+                  outcome={outcome ?? undefined}
                 />
               ) : (
                 <Card variant="outlined">
@@ -265,11 +264,21 @@ export default function ProblemDetailScreen() {
               <Text variant="headingSmall" color="textPrimary">
                 What happened?
               </Text>
-              <SegmentedControl<Outcome>
-                options={[...OUTCOME_OPTIONS]}
-                value={outcome}
-                onChange={setOutcome}
-              />
+              <Box gap="s">
+                {OUTCOME_OPTIONS.map((option) => (
+                  <Button
+                    key={option.value}
+                    label={saving ? 'Saving...' : option.label}
+                    variant={outcome === option.value ? 'primary' : 'secondary'}
+                    size="large"
+                    onPress={() => {
+                      setOutcome(option.value);
+                      void handleSave(option.value);
+                    }}
+                    disabled={saving || !sessionId}
+                  />
+                ))}
+              </Box>
             </Box>
           </ScreenReveal>
 
@@ -331,13 +340,15 @@ export default function ProblemDetailScreen() {
           </ScreenReveal>
 
           <ScreenReveal delay={300}>
-            <Button
-              label={saving ? 'Saving...' : 'Save Log'}
-              variant="primary"
-              size="large"
-              onPress={handleSave}
-              disabled={saving || !sessionId}
-            />
+            {outcome ? (
+              <Button
+                label={saving ? 'Saving...' : 'Update details'}
+                variant="secondary"
+                size="large"
+                onPress={() => void handleSave(outcome, false)}
+                disabled={saving || !sessionId}
+              />
+            ) : null}
           </ScreenReveal>
         </Box>
       </ScrollView>

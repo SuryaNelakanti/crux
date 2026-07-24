@@ -1,37 +1,7 @@
+import type { Database as GeneratedDatabase } from '@crux/shared';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
-// biome-ignore lint/suspicious/noExplicitAny: Supabase-generated types are pending.
-type AnyRow = Record<string, any>;
-
-// Placeholder for generated types from Supabase CLI
-// Run `pnpm supabase:types` to generate this
-// Using permissive types until then
-export type Database = {
-  public: {
-    Tables: {
-      users: { Row: AnyRow; Insert: AnyRow; Update: AnyRow };
-      sessions: { Row: AnyRow; Insert: AnyRow; Update: AnyRow };
-      problems: { Row: AnyRow; Insert: AnyRow; Update: AnyRow };
-      problem_members: { Row: AnyRow; Insert: AnyRow; Update: AnyRow };
-      media: { Row: AnyRow; Insert: AnyRow; Update: AnyRow };
-      route_masks: { Row: AnyRow; Insert: AnyRow; Update: AnyRow };
-      user_problem_logs: { Row: AnyRow; Insert: AnyRow; Update: AnyRow };
-      events: { Row: AnyRow; Insert: AnyRow; Update: AnyRow };
-    };
-    Views: Record<string, never>;
-    Functions: {
-      resolve_problem_share_token: {
-        Args: { p_token: string };
-        Returns: string | null;
-      };
-      join_problem_with_token: {
-        Args: { p_token: string };
-        Returns: string | null;
-      };
-    };
-    Enums: Record<string, never>;
-  };
-};
+export type Database = GeneratedDatabase;
 
 export type SupabaseClient = ReturnType<typeof createSupabaseClient<Database>>;
 

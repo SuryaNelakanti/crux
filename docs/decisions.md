@@ -514,3 +514,13 @@ hold detection, route grouping, and route selection.
 - SAM output can improve edge quality through reviewed labels or distillation
   without becoming the product fallback.
 - The app remains offline-first and does not gain a runtime SAM dependency.
+
+## 2026-07-24: Session Film MVP capture loop
+
+Approved MVP behavior is now the three-action Session Film loop:
+
+1. **Log a climb** creates or reuses the active session and opens camera/photo capture.
+2. The captured photo immediately starts the existing heuristic route-mask pipeline and shows a quiet mask overlay on the photo.
+3. Tapping **Flash**, **Sent**, or **Tried** writes the log immediately and returns control to the active session.
+
+There is no separate Save step and no default outcome. Attempts, grade, notes, sharing, session controls, and mask correction remain progressively disclosed. The primary route detail affordance is **Fix route**, shown when mask confidence is low or when the user opens more details.

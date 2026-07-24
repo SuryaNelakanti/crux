@@ -1,10 +1,10 @@
+import type { Outcome } from '@crux/shared';
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
   TextareaHTMLAttributes,
 } from 'react';
-import { type Outcome } from '@crux/shared';
 
 /* --------------------------------------------------------------------------
    BUTTON
@@ -41,15 +41,21 @@ export function Card({
   onClick?: () => void;
 }) {
   const variantClass = variant === 'default' ? '' : `card-${variant}`;
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={`card ${variantClass} ${className ?? ''}`}
+        style={style}
+        onClick={onClick}
+      >
+        {children}
+      </button>
+    );
+  }
+
   return (
-    <div
-      className={`card ${variantClass} ${className ?? ''}`}
-      style={style}
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick() : undefined}
-    >
+    <div className={`card ${variantClass} ${className ?? ''}`} style={style}>
       {children}
     </div>
   );
@@ -69,9 +75,7 @@ export function Badge({
 }) {
   // Map 'brand' to 'default' for backwards compatibility
   const variantClass = variant === 'default' || variant === 'brand' ? '' : variant;
-  return (
-    <span className={`badge ${variantClass} ${className ?? ''}`}>{label}</span>
-  );
+  return <span className={`badge ${variantClass} ${className ?? ''}`}>{label}</span>;
 }
 
 /* --------------------------------------------------------------------------
@@ -108,8 +112,7 @@ export function Segmented<T extends string>({
         <button
           key={option.value}
           type="button"
-          role="radio"
-          aria-checked={option.value === value}
+          aria-pressed={option.value === value}
           className={option.value === value ? 'active' : ''}
           onClick={() => onChange(option.value)}
         >
@@ -124,17 +127,17 @@ export function Segmented<T extends string>({
    OUTCOME CHIPS (horizontal radio-style)
    -------------------------------------------------------------------------- */
 const OUTCOME_LABELS: Record<Outcome, string> = {
-  tried: '🔴 Tried',
-  send: '🟢 Sent',
-  flash: '⚡ Flash',
-  project: '🎯 Project',
+  tried: 'Tried',
+  send: 'Sent',
+  flash: 'Flash',
+  project: 'Project',
 };
 
 export function OutcomeChips({
   value,
   onChange,
 }: {
-  value: Outcome;
+  value: Outcome | null;
   onChange: (outcome: Outcome) => void;
 }) {
   const outcomes: Outcome[] = ['tried', 'send', 'flash'];
@@ -145,8 +148,7 @@ export function OutcomeChips({
         <button
           key={outcome}
           type="button"
-          role="radio"
-          aria-checked={outcome === value}
+          aria-pressed={outcome === value}
           data-outcome={outcome}
           className="outcome-chip"
           onClick={() => onChange(outcome)}
@@ -187,7 +189,9 @@ export function GradeSelector({
         −
       </button>
 
-      <span style={{ fontWeight: 600, fontSize: 'var(--text-lg)', minWidth: 48, textAlign: 'center' }}>
+      <span
+        style={{ fontWeight: 600, fontSize: 'var(--text-lg)', minWidth: 48, textAlign: 'center' }}
+      >
         V{displayValue}
       </span>
 
@@ -215,14 +219,19 @@ export function GradeSelector({
    -------------------------------------------------------------------------- */
 export function StatChip({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="stat-chip" style={{
-      padding: 'var(--space-2) var(--space-3)',
-      borderRadius: 'var(--radius-md)',
-      border: '1px solid var(--color-border)',
-      background: 'var(--color-surface)',
-    }}>
+    <div
+      className="stat-chip"
+      style={{
+        padding: 'var(--space-2) var(--space-3)',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--color-border)',
+        background: 'var(--color-surface)',
+      }}
+    >
       <strong style={{ display: 'block', fontSize: 'var(--text-lg)' }}>{value}</strong>
-      <span className="muted" style={{ fontSize: 'var(--text-xs)' }}>{label}</span>
+      <span className="muted" style={{ fontSize: 'var(--text-xs)' }}>
+        {label}
+      </span>
     </div>
   );
 }
@@ -234,9 +243,9 @@ export function Toast({ message, visible }: { message: string; visible: boolean 
   if (!visible) return null;
 
   return (
-    <div className="toast" role="status" aria-live="polite">
+    <output className="toast" aria-live="polite">
       {message}
-    </div>
+    </output>
   );
 }
 
@@ -272,7 +281,15 @@ export function Collapsible({
 
 function ChevronDown() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
       <polyline points="6 9 12 15 18 9" />
     </svg>
   );

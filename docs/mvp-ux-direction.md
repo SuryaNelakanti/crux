@@ -96,3 +96,7 @@ The reward should reinforce completion without delaying the climber.
 
 - [Session Film](design/mvp-session-film.png)
 - [Quiet Instrument](design/mvp-quiet-instrument.png)
+
+## Locked MVP Interaction Update — 2026-07-24
+
+Session Film uses a three-action loop: **Log a climb → photo/mask → Flash/Sent/Tried**. The mask appears as a simple, chalky overlay over the captured photo. The product should avoid dashboard, terminal, and analytics language in the primary path. Secondary controls are tucked away: attempts, grade, note, sharing, session controls, and **Fix route** only appear when confidence is low or the climber asks for more.

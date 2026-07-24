@@ -1,6 +1,7 @@
 import {
   generateId,
   IMAGE_COMPRESSION_QUALITY,
+  IMAGE_PROCESSING_MAX_WIDTH,
   IMAGE_STORAGE_MAX_WIDTH,
   type MediaType,
 } from '@crux/shared';

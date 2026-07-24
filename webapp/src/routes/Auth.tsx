@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Badge, Button, Card, Input } from '@/components/ui';
+import { Button, Input } from '@/components/ui';
 
 export function AuthRoute() {
   const [email, setEmail] = useState('');
@@ -32,50 +32,55 @@ export function AuthRoute() {
   };
 
   return (
-    <div className="app-shell" style={{ justifyContent: 'center', minHeight: '100vh' }}>
-      {/* Brand */}
-      <header className="top-bar" style={{ marginBottom: 'var(--space-4)' }}>
-        <div className="top-bar-brand">
-          <div className="brand-mark">🧗</div>
-          <span className="brand-title">Crux</span>
+    <main className="auth-shell">
+      <section className="auth-scene" aria-labelledby="auth-promise">
+        <div className="auth-brand">
+          <span className="crux-mark" aria-hidden="true" />
+          <span>Crux</span>
         </div>
-      </header>
+        <div className="auth-promise">
+          <p className="eyebrow">Indoor bouldering journal</p>
+          <h1 id="auth-promise">Log the climb. Get back on the wall.</h1>
+          <p>Photo, route mask, outcome. Done in a few taps.</p>
+        </div>
+      </section>
 
-      {/* Auth card */}
-      <Card style={{ maxWidth: 400, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
+      <section className="auth-entry" aria-labelledby="sign-in-title">
+        <form
+          className="auth-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSend();
+          }}
+        >
           <div>
-            <h1 style={{ fontSize: 'var(--text-xl)', fontWeight: 600, margin: 0 }}>
-              Get your magic link
-            </h1>
-            <p className="muted text-sm" style={{ marginTop: 'var(--space-1)' }}>
-              No passwords. We'll email you.
-            </p>
+            <p className="eyebrow">Welcome back</p>
+            <h2 id="sign-in-title">Sign in</h2>
+            <p className="auth-supporting">No password required.</p>
           </div>
 
+          <label className="auth-label" htmlFor="auth-email">
+            Email
+          </label>
           <Input
+            id="auth-email"
             type="email"
+            autoComplete="email"
             placeholder="you@example.com"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            onChange={(event) => setEmail(event.target.value)}
           />
 
-          <Button variant="primary" onClick={handleSend} disabled={status === 'sending' || !email.trim()}>
-            {status === 'sending' ? 'Sending…' : 'Send link →'}
+          <Button variant="primary" type="submit" disabled={status === 'sending' || !email.trim()}>
+            {status === 'sending' ? 'Sending…' : 'Email me a sign-in link'}
           </Button>
 
-          {status === 'sent' && (
-            <Badge label="Check your inbox ✓" variant="success" />
-          )}
-          {error && <Badge label={error} variant="warning" />}
-        </div>
-      </Card>
-
-      {/* Minimal tagline */}
-      <p className="muted text-sm" style={{ textAlign: 'center', marginTop: 'var(--space-4)' }}>
-        Snap → Auto-mask → Log
-      </p>
-    </div>
+          <div className="auth-status" aria-live="polite">
+            {status === 'sent' && <p>Check your inbox. Your link is on the way.</p>}
+            {error && <p className="auth-error">{error}</p>}
+          </div>
+        </form>
+      </section>
+    </main>
   );
 }

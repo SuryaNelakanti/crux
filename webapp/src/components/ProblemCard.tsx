@@ -42,7 +42,7 @@ export function ProblemCard({
         style={{
           position: 'relative',
           width: '100%',
-          paddingTop: '75%', /* 4:3 aspect ratio */
+          paddingTop: '75%' /* 4:3 aspect ratio */,
           background: 'var(--ink-900)',
           borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
           overflow: 'hidden',
@@ -80,7 +80,14 @@ export function ProblemCard({
 
       {/* Meta */}
       <div style={{ padding: 'var(--space-4)', flex: 1 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 'var(--space-2)',
+          }}
+        >
           <div>
             <div style={{ fontWeight: 600 }}>{title}</div>
             <div className="muted text-sm">{subtitle}</div>

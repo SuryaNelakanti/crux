@@ -9,7 +9,7 @@
  * - Fresh database: `pnpm supabase:reset`
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // Local Supabase default credentials
 const SUPABASE_URL = 'http://127.0.0.1:54321';
@@ -63,16 +63,18 @@ describe('RLS Policies', () => {
       return data.user.id;
     };
 
-    ownerId = (await createUser(TEST_USER_EMAIL, TEST_USER_PASSWORD))!;
-    memberId = (await createUser(TEST_MEMBER_EMAIL, TEST_MEMBER_PASSWORD))!;
-    outsiderId = (await createUser(TEST_OUTSIDER_EMAIL, TEST_OUTSIDER_PASSWORD))!;
+    const createdOwnerId = await createUser(TEST_USER_EMAIL, TEST_USER_PASSWORD);
+    const createdMemberId = await createUser(TEST_MEMBER_EMAIL, TEST_MEMBER_PASSWORD);
+    const createdOutsiderId = await createUser(TEST_OUTSIDER_EMAIL, TEST_OUTSIDER_PASSWORD);
+    if (!createdOwnerId || !createdMemberId || !createdOutsiderId) {
+      throw new Error('Failed to create test users');
+    }
+    ownerId = createdOwnerId;
+    memberId = createdMemberId;
+    outsiderId = createdOutsiderId;
 
     // Ensure users exist in public.users table
-    await adminClient.from('users').upsert([
-      { id: ownerId },
-      { id: memberId },
-      { id: outsiderId },
-    ]);
+    await adminClient.from('users').upsert([{ id: ownerId }, { id: memberId }, { id: outsiderId }]);
 
     // Create authenticated clients
     const createAuthClient = async (email: string, password: string) => {
@@ -94,7 +96,8 @@ describe('RLS Policies', () => {
       .insert({ user_id: ownerId, start_ts: new Date().toISOString() })
       .select()
       .single();
-    sessionId = session!.id;
+    if (!session) throw new Error('Failed to create session');
+    sessionId = session.id;
 
     // Create test problem via admin
     const { data: problem } = await adminClient
@@ -105,7 +108,8 @@ describe('RLS Policies', () => {
       })
       .select()
       .single();
-    problemId = problem!.id;
+    if (!problem) throw new Error('Failed to create problem');
+    problemId = problem.id;
 
     // Add member to problem
     await adminClient.from('problem_members').insert({
@@ -130,14 +134,11 @@ describe('RLS Policies', () => {
 
       expect(error).toBeNull();
       expect(data).toHaveLength(1);
-      expect(data![0].id).toBe(problemId);
+      expect(data?.[0]?.id).toBe(problemId);
     });
 
     it('member can select shared problems', async () => {
-      const { data, error } = await memberClient
-        .from('problems')
-        .select('id')
-        .eq('id', problemId);
+      const { data, error } = await memberClient.from('problems').select('id').eq('id', problemId);
 
       expect(error).toBeNull();
       expect(data).toHaveLength(1);
@@ -216,16 +217,19 @@ describe('RLS Policies', () => {
 
   describe('Media table (regression test)', () => {
     it('inserting media does not cause stack depth error', async () => {
-      const { data, error } = await ownerClient.from('media').insert({
-        problem_id: problemId,
-        type: 'photo',
-        storage_path: `${problemId}/test.jpg`,
-        width: 100,
-        height: 100,
-      }).select();
+      const { data, error } = await ownerClient
+        .from('media')
+        .insert({
+          problem_id: problemId,
+          type: 'photo',
+          storage_path: `${problemId}/test.jpg`,
+          width: 100,
+          height: 100,
+        })
+        .select();
 
       expect(error?.message).not.toContain('stack depth limit exceeded');
-      
+
       // Cleanup
       if (data?.[0]?.id) {
         await adminClient.from('media').delete().eq('id', data[0].id);

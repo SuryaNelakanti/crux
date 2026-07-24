@@ -216,10 +216,17 @@ export async function fetchSessions(): Promise<SessionSummary[]> {
       startTs: new Date(row.start_ts),
       endTs: row.end_ts ? new Date(row.end_ts) : null,
       problemCount: sessionProblems.length,
-      sendCount: sessionLogs.filter((log: { outcome: Outcome }) => log.outcome === 'send').length,
-      flashCount: sessionLogs.filter((log: { outcome: Outcome }) => log.outcome === 'flash').length,
+      sendCount: sessionLogs.filter((log) => log.outcome === 'send').length,
+      flashCount: sessionLogs.filter((log) => log.outcome === 'flash').length,
     };
   });
+}
+
+export async function createOrReuseActiveSession(): Promise<string> {
+  const sessions = await fetchSessions();
+  const active = sessions.find((session) => !session.endTs);
+  if (active) return active.id;
+  return createSession();
 }
 
 export async function createSession(): Promise<string> {
@@ -648,15 +655,15 @@ export async function saveMaskVersion(params: {
   const method = params.method ?? 'manual-edit';
   const confidence = params.confidence ?? null;
   const seedColor = params.seedColor ?? null;
+  const seedColorJson = seedColor ? { h: seedColor.h, s: seedColor.s, l: seedColor.l } : null;
   const { error } = await client.from('route_masks').insert({
     id: routeMaskId,
     problem_id: params.problemId,
     version: nextVersion,
     mask_media_id: maskMediaId,
     method,
-    seed_color_json: seedColor,
+    seed_color_json: seedColorJson,
     confidence,
-    metadata_json: params.metadataJson ?? null,
     created_by: user.id,
     created_at: now.toISOString(),
   });

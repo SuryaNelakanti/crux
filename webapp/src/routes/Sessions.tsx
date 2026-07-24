@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FAB } from '@/components/FAB';
 import { Skeleton } from '@/components/Skeleton';
 import { Badge, Button } from '@/components/ui';
-import { createProblemFromUpload, createSession, fetchSessions } from '@/lib/api';
+import { createOrReuseActiveSession, createProblemFromUpload, fetchSessions } from '@/lib/api';
 import { getSupabaseClient } from '@/lib/supabase';
 
 export function SessionsRoute() {
@@ -17,8 +17,7 @@ export function SessionsRoute() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchSessions();
-      setSessions(data);
+      setSessions(await fetchSessions());
     } finally {
       setLoading(false);
     }
@@ -28,9 +27,7 @@ export function SessionsRoute() {
     void load();
   }, [load]);
 
-  const handleCapture = () => {
-    fileRef.current?.click();
-  };
+  const handleCapture = () => fileRef.current?.click();
 
   const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -38,12 +35,11 @@ export function SessionsRoute() {
     setUploading(true);
     setError(null);
     try {
-      const sessionId = await createSession();
+      const sessionId = await createOrReuseActiveSession();
       const problemId = await createProblemFromUpload({ sessionId, file });
       navigate(`/problem/${problemId}`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Upload failed';
-      setError(message);
+      setError(err instanceof Error ? err.message : 'Photo capture failed');
     } finally {
       setUploading(false);
       event.target.value = '';
@@ -51,124 +47,94 @@ export function SessionsRoute() {
   };
 
   const handleSignOut = async () => {
-    const client = getSupabaseClient();
-    await client.auth.signOut();
+    await getSupabaseClient().auth.signOut();
   };
 
-  const totalProblems = sessions.reduce((sum, s) => sum + s.problemCount, 0);
+  const activeSession = sessions.find((session) => !session.endTs) ?? null;
+  const totalProblems = sessions.reduce((sum, session) => sum + session.problemCount, 0);
 
   return (
-    <div className="app-shell">
-      {/* Header - Atlas Style */}
-      <header className="top-bar">
-        <div className="top-bar-brand">
-          <div className="brand-mark">▲</div> {/* Atlas-like Triangle symbol */}
-          <span className="serif" style={{ fontSize: '1.25rem' }}>Crux Journal</span>
-        </div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-          <Button variant="secondary" onClick={handleSignOut}>
-            LOG_OUT
-          </Button>
-        </div>
+    <div className="app-shell session-film-shell">
+      <header className="top-bar film-top-bar">
+        <button
+          type="button"
+          className="brand-button"
+          onClick={() => navigate('/')}
+          aria-label="Crux home"
+        >
+          <span className="brand-mark">▲</span>
+          <span>Crux</span>
+        </button>
+        <Button variant="ghost" onClick={handleSignOut}>
+          Sign out
+        </Button>
       </header>
 
-      {/* Technical Status Block */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '1px',
-        background: 'var(--border-default)',
-        border: '1px solid var(--border-default)',
-        marginBottom: 'var(--space-4)'
-      }}>
-        <div style={{ background: 'var(--bg-primary)', padding: 'var(--space-4)' }}>
-          <div className="mono" style={{ color: 'var(--text-muted)' }}>TOTAL_ENTRIES</div>
-          <div className="serif" style={{ fontSize: '2rem' }}>{totalProblems}</div>
-        </div>
-        <div style={{ background: 'var(--bg-primary)', padding: 'var(--space-4)' }}>
-          <div className="mono" style={{ color: 'var(--text-muted)' }}>ACTIVE_SESSIONS</div>
-          <div className="serif" style={{ fontSize: '2rem' }}>{sessions.length}</div>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 className="mono" style={{ fontSize: '0.8rem' }}>// RECENT_LOGS</h2>
+      <section className="hero-film">
+        <p className="eyebrow">Session Film</p>
+        <h1>One chalky hand. One send recorded.</h1>
+        <p className="hero-copy">
+          Log a climb, let Crux trace the route, then tap Flash, Sent, or Tried. No save screen. No
+          dashboard.
+        </p>
         <Button variant="primary" onClick={handleCapture} disabled={uploading}>
-          {uploading ? 'UPLOADING...' : '+ NEW_ENTRY'}
+          {uploading ? 'Masking route…' : activeSession ? 'Log a climb' : 'Start with a climb'}
         </Button>
-      </div>
+        <div className="quiet-stats">
+          <span>{activeSession ? 'Active session ready' : 'New session starts on capture'}</span>
+          <span>{totalProblems} climbs logged</span>
+        </div>
+      </section>
 
       {error && <Badge label={error} variant="warning" />}
 
-      {/* Sessions List */}
-      {loading ? (
-        <div className="grid">
-          <Skeleton variant="card" />
-          <Skeleton variant="card" />
+      <section className="section-stack" aria-labelledby="recent-sessions">
+        <div className="section-heading">
+          <h2 id="recent-sessions">Recent sessions</h2>
+          <Button variant="secondary" onClick={handleCapture} disabled={uploading}>
+            Log a climb
+          </Button>
         </div>
-      ) : sessions.length === 0 ? (
-        <button
-          type="button"
-          onClick={handleCapture}
-          style={{
-            width: '100%',
-            padding: 'var(--space-8)',
-            background: 'var(--bg-secondary)',
-            border: '1px dashed var(--border-strong)',
-            cursor: 'pointer',
-            textAlign: 'center'
-          }}
-        >
-          <div className="serif" style={{ fontSize: '1.5rem', marginBottom: 'var(--space-2)' }}>No Data Found</div>
-          <div className="mono">INITIATE_FIRST_CAPTURE_SEQUENCE</div>
-        </button>
-      ) : (
-        <div className="grid">
-          {sessions.map((session, i) => (
-            <button
-              key={session.id}
-              type="button"
-              onClick={() => navigate(`/session/${session.id}`)}
-              className="card reveal"
-              style={{
-                animationDelay: `${i * 100}ms`,
-                textAlign: 'left',
-                display: 'flex',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                width: '100%',
-                alignItems: 'center'
-              }}
-            >
-              <div>
-                <div className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                  ID: {session.id.split('-')[0].toUpperCase()}
-                </div>
-                <div className="serif" style={{ fontSize: '1.25rem' }}>
-                  {session.startTs.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                </div>
-                <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-                  <span className="mono" style={{ fontSize: '0.75rem' }}>PROBS: {session.problemCount}</span>
-                  <span className="mono" style={{ fontSize: '0.75rem' }}>SENDS: {session.sendCount}</span>
-                </div>
-              </div>
+        {loading ? (
+          <div className="grid">
+            <Skeleton variant="card" />
+            <Skeleton variant="card" />
+          </div>
+        ) : sessions.length === 0 ? (
+          <button type="button" onClick={handleCapture} className="empty-film-card">
+            <span>Open the camera and capture your first route.</span>
+            <strong>Log a climb</strong>
+          </button>
+        ) : (
+          <div className="session-list">
+            {sessions.map((session) => (
+              <button
+                key={session.id}
+                type="button"
+                onClick={() => navigate(`/session/${session.id}`)}
+                className="session-row"
+              >
+                <span>
+                  <strong>
+                    {session.startTs.toLocaleDateString(undefined, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </strong>
+                  <small>
+                    {session.endTs ? 'Finished' : 'Active'} · {session.problemCount} climbs ·{' '}
+                    {session.flashCount} flash · {session.sendCount} sent
+                  </small>
+                </span>
+                <span aria-hidden="true">→</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
 
-              <div style={{
-                width: '32px', height: '32px',
-                border: '1px solid var(--border-strong)',
-                display: 'grid', placeItems: 'center',
-                color: 'var(--text-secondary)'
-              }}>
-                →
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* FAB - Adjusted for tech feel */}
       <FAB onClick={handleCapture} aria-busy={uploading} />
-
       <input
         ref={fileRef}
         type="file"

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Route, Routes } from 'react-router-dom';
+import { RandomDoodles } from '@/components/Doodle';
 import { ensureUserProfile } from '@/lib/api';
 import { initSupabaseClient } from '@/lib/supabase';
 import { AuthRoute } from '@/routes/Auth';
@@ -7,7 +8,6 @@ import { MaskEditorRoute } from '@/routes/MaskEditor';
 import { ProblemDetailRoute } from '@/routes/ProblemDetail';
 import { SessionDetailRoute } from '@/routes/SessionDetail';
 import { SessionsRoute } from '@/routes/Sessions';
-import { RandomDoodles } from '@/components/Doodle';
 
 export function App() {
   const [ready, setReady] = useState(false);

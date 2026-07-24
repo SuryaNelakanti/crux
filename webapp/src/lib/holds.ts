@@ -1,7 +1,15 @@
-import { detectHoldsContrast, type ContrastDetectionResult, type ContrastHoldCandidate, type HSL } from '@crux/vision';
+import {
+  type ContrastDetectionResult,
+  type ContrastHoldCandidate,
+  detectHoldsContrast,
+  type HSL,
+} from '@crux/vision';
 import { readImagePixels } from './image';
 
-const hslDistance = (a: { h: number; s: number; l: number }, b: { h: number; s: number; l: number }): number => {
+const hslDistance = (
+  a: { h: number; s: number; l: number },
+  b: { h: number; s: number; l: number }
+): number => {
   const rawHue = Math.abs(a.h - b.h);
   const hue = Math.min(rawHue, 360 - rawHue) / 180;
   const sat = (a.s - b.s) / 100;
@@ -11,8 +19,13 @@ const hslDistance = (a: { h: number; s: number; l: number }, b: { h: number; s: 
   return Math.sqrt((hue * hueWeight) ** 2 + sat * sat + (light * lightWeight) ** 2);
 };
 
-export type EnrichedContrastHoldCandidate = ContrastHoldCandidate & { clusterIndex: number; center: HSL };
-export type EnrichedDetectionResult = Omit<ContrastDetectionResult, 'holds'> & { holds: EnrichedContrastHoldCandidate[] };
+export type EnrichedContrastHoldCandidate = ContrastHoldCandidate & {
+  clusterIndex: number;
+  center: HSL;
+};
+export type EnrichedDetectionResult = Omit<ContrastDetectionResult, 'holds'> & {
+  holds: EnrichedContrastHoldCandidate[];
+};
 
 export async function detectHoldsFromPhoto(params: {
   uri: string;
@@ -47,7 +60,12 @@ export async function detectHoldsFromPhoto(params: {
 }
 
 export const buildRouteMaskForCluster = (
-  detection: { labels: Int32Array; holds: { clusterIndex: number; id: number }[]; width: number; height: number },
+  detection: {
+    labels: Int32Array;
+    holds: { clusterIndex: number; id: number }[];
+    width: number;
+    height: number;
+  },
   clusterIndex: number | null
 ): Uint8Array => {
   const { labels, holds, width, height } = detection;
@@ -65,7 +83,12 @@ export const buildRouteMaskForCluster = (
 };
 
 export const buildRouteMaskForHoldColor = (
-  detection: { labels: Int32Array; holds: { id: number; avgColor: HSL; center: HSL; clusterIndex: number }[]; width: number; height: number },
+  detection: {
+    labels: Int32Array;
+    holds: { id: number; avgColor: HSL; center: HSL; clusterIndex: number }[];
+    width: number;
+    height: number;
+  },
   holdId: number | null,
   options?: { threshold?: number }
 ): Uint8Array => {
@@ -76,9 +99,7 @@ export const buildRouteMaskForHoldColor = (
   if (!targetHold) return routeMask;
   const target = targetHold.avgColor ?? targetHold.center;
   const targetCluster = targetHold.clusterIndex;
-  const threshold =
-    options?.threshold ??
-    (target.s < 18 ? 0.11 : 0.15);
+  const threshold = options?.threshold ?? (target.s < 18 ? 0.11 : 0.15);
 
   const matching = new Set<number>();
   for (const hold of holds) {
@@ -99,13 +120,12 @@ export const buildRouteMaskForHoldColor = (
   return routeMask;
 };
 
-export const pickBestCluster = (detection: { holds: { clusterIndex: number; score: number }[] }): number | null => {
+export const pickBestCluster = (detection: {
+  holds: { clusterIndex: number; score: number }[];
+}): number | null => {
   const clusterScores = new Map<number, number>();
   for (const hold of detection.holds) {
-    clusterScores.set(
-      hold.clusterIndex,
-      (clusterScores.get(hold.clusterIndex) ?? 0) + hold.score
-    );
+    clusterScores.set(hold.clusterIndex, (clusterScores.get(hold.clusterIndex) ?? 0) + hold.score);
   }
   return [...clusterScores.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 };
