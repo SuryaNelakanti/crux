@@ -532,6 +532,12 @@ body::after {
   transform: translateX(-50%) scale(0.92);
 }
 
+@media (min-width: 761px) {
+  .session-film-shell .fab {
+    display: none;
+  }
+}
+
 /* --------------------------------------------------------------------------
    SESSION FILM REDESIGN
    -------------------------------------------------------------------------- */

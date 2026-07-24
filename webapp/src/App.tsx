@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { RandomDoodles } from '@/components/Doodle';
-import { ensureUserProfile } from '@/lib/api';
+import { ensureUserProfile, isLocalMockMode } from '@/lib/api';
 import { initSupabaseClient } from '@/lib/supabase';
 import { AuthRoute } from '@/routes/Auth';
 import { MaskEditorRoute } from '@/routes/MaskEditor';
@@ -10,11 +10,12 @@ import { SessionDetailRoute } from '@/routes/SessionDetail';
 import { SessionsRoute } from '@/routes/Sessions';
 
 export function App() {
-  const [ready, setReady] = useState(false);
-  const [signedIn, setSignedIn] = useState(false);
+  const [ready, setReady] = useState(isLocalMockMode);
+  const [signedIn, setSignedIn] = useState(isLocalMockMode);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isLocalMockMode) return undefined;
     try {
       const client = initSupabaseClient();
       const load = async () => {

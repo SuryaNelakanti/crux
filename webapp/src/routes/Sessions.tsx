@@ -3,7 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { FAB } from '@/components/FAB';
 import { Skeleton } from '@/components/Skeleton';
 import { Badge, Button } from '@/components/ui';
-import { createOrReuseActiveSession, createProblemFromUpload, fetchSessions } from '@/lib/api';
+import {
+  createOrReuseActiveSession,
+  createProblemFromUpload,
+  fetchSessions,
+  isLocalMockMode,
+  resetLocalDemo,
+} from '@/lib/api';
 import { getSupabaseClient } from '@/lib/supabase';
 
 export function SessionsRoute() {
@@ -47,6 +53,11 @@ export function SessionsRoute() {
   };
 
   const handleSignOut = async () => {
+    if (isLocalMockMode) {
+      await resetLocalDemo();
+      await load();
+      return;
+    }
     await getSupabaseClient().auth.signOut();
   };
 
@@ -66,7 +77,7 @@ export function SessionsRoute() {
           <span>Crux</span>
         </button>
         <Button variant="ghost" onClick={handleSignOut}>
-          Sign out
+          {isLocalMockMode ? 'Reset demo' : 'Sign out'}
         </Button>
       </header>
 

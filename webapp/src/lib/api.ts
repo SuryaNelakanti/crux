@@ -11,7 +11,23 @@ import type { HSL } from '@crux/vision';
 import { buildRouteMaskForCluster, detectHoldsFromPhoto, pickBestCluster } from './holds';
 import { preparePhotoForUpload } from './image';
 import { buildMaskRgba, generateMaskFromPhoto, rgbaToBlob } from './mask';
+import {
+  createMockProblemFromUpload,
+  createMockSession,
+  endMockSession,
+  ensureMockUserProfile,
+  fetchMockProblemDetail,
+  fetchMockProblemsForSession,
+  fetchMockSessions,
+  getMockAuthUser,
+  resetMockData,
+  saveMockMaskVersion,
+  saveMockProblemLog,
+} from './mock-api';
+import { isLocalMockMode } from './runtime';
 import { getSupabaseClient } from './supabase';
+
+export { isLocalMockMode } from './runtime';
 
 export interface SessionSummary {
   id: string;
@@ -141,6 +157,7 @@ interface AuthUser {
 }
 
 export async function getAuthUser(): Promise<AuthUser | null> {
+  if (isLocalMockMode) return getMockAuthUser();
   const client = getSupabaseClient();
   console.log('[getAuthUser] Calling client.auth.getUser()...');
   const timeoutPromise = new Promise<never>((_, reject) =>
@@ -159,6 +176,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 }
 
 export async function ensureUserProfile() {
+  if (isLocalMockMode) return ensureMockUserProfile();
   const client = getSupabaseClient();
   console.log('[ensureUserProfile] Getting auth user...');
   const user = await getAuthUser();
@@ -179,6 +197,7 @@ export async function ensureUserProfile() {
 }
 
 export async function fetchSessions(): Promise<SessionSummary[]> {
+  if (isLocalMockMode) return fetchMockSessions();
   const client = getSupabaseClient();
   const user = await getAuthUser();
   if (!user) return [];
@@ -230,6 +249,7 @@ export async function createOrReuseActiveSession(): Promise<string> {
 }
 
 export async function createSession(): Promise<string> {
+  if (isLocalMockMode) return createMockSession();
   const client = getSupabaseClient();
   const user = await getAuthUser();
   if (!user) throw new Error('Not signed in');
@@ -259,6 +279,7 @@ export async function createSession(): Promise<string> {
 }
 
 export async function endSession(sessionId: string): Promise<void> {
+  if (isLocalMockMode) return endMockSession(sessionId);
   const client = getSupabaseClient();
   const user = await getAuthUser();
   if (!user) return;
@@ -281,6 +302,7 @@ export async function endSession(sessionId: string): Promise<void> {
 }
 
 export async function fetchProblemsForSession(sessionId: string): Promise<ProblemCardItem[]> {
+  if (isLocalMockMode) return fetchMockProblemsForSession(sessionId);
   const client = getSupabaseClient();
   const user = await getAuthUser();
   if (!user) return [];
@@ -338,6 +360,7 @@ export async function fetchProblemsForSession(sessionId: string): Promise<Proble
 }
 
 export async function fetchProblemDetail(problemId: string): Promise<ProblemDetail | null> {
+  if (isLocalMockMode) return fetchMockProblemDetail(problemId);
   const client = getSupabaseClient();
   const user = await getAuthUser();
   if (!user) return null;
@@ -397,6 +420,7 @@ export async function createProblemFromUpload(params: {
   sessionId: string;
   file: File;
 }): Promise<string> {
+  if (isLocalMockMode) return createMockProblemFromUpload(params);
   const client = getSupabaseClient();
   const user = await getAuthUser();
   if (!user) throw new Error('Not signed in');
@@ -557,6 +581,7 @@ export async function saveProblemLog(params: {
   gradeMax: number | null;
   note: string | null;
 }): Promise<void> {
+  if (isLocalMockMode) return saveMockProblemLog(params);
   const client = getSupabaseClient();
   const user = await getAuthUser();
   if (!user) return;
@@ -617,6 +642,7 @@ export async function saveMaskVersion(params: {
   confidence?: number | null;
   metadataJson?: Record<string, unknown> | null;
 }): Promise<string> {
+  if (isLocalMockMode) return saveMockMaskVersion(params);
   const client = getSupabaseClient();
   const user = await getAuthUser();
   if (!user) throw new Error('Not signed in');
@@ -699,4 +725,9 @@ export const getMaskConfidenceLabel = (confidence: number | null) => {
   if (confidence === null) return 'Manual';
   if (confidence < AUTO_MASK_CONFIDENCE_THRESHOLD) return 'Low confidence';
   return 'Ready';
+};
+
+export const resetLocalDemo = async () => {
+  if (!isLocalMockMode) return;
+  await resetMockData();
 };
