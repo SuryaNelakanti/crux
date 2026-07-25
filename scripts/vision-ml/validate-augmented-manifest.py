@@ -7,11 +7,20 @@ from pathlib import Path
 from _common import build_parser, read_jsonl
 
 
-PSEUDO_SOURCES = {"reviewed-sam3", "sam3-proposal", "sam3_pseudo"}
+PSEUDO_SOURCES = {
+    "reviewed-sam",
+    "reviewed-sam2",
+    "reviewed-sam3",
+    "sam2-bbox-refine",
+    "sam2-proposal",
+    "sam2_pseudo",
+    "sam3-proposal",
+    "sam3_pseudo",
+}
 
 
 def parse_args():
-    parser = build_parser("Validate train-only boundaries for SAM3-augmented manifests.")
+    parser = build_parser("Validate train-only boundaries for SAM-family augmented manifests.")
     parser.add_argument("--manifest", default=".data/vision/heidelberg-sam3-train/manifest.jsonl")
     parser.add_argument("--out", default=None)
     parser.add_argument("--strict", action="store_true")
@@ -22,7 +31,7 @@ def is_pseudo_row(row: dict) -> bool:
     label_source = str(row.get("labelSource", ""))
     if label_source in PSEUDO_SOURCES or label_source.startswith("reviewed-") or label_source.endswith("-pseudo"):
         return True
-    if str(row.get("id", "")).startswith("sam3_"):
+    if str(row.get("id", "")).startswith(("sam_", "sam2_", "sam3_")):
         return True
     for hold in row.get("holds", []):
         if not isinstance(hold, dict):
@@ -30,7 +39,7 @@ def is_pseudo_row(row: dict) -> bool:
         hold_source = str(hold.get("labelSource", ""))
         if hold_source in PSEUDO_SOURCES or hold_source.startswith("reviewed-") or hold_source.endswith("-pseudo"):
             return True
-        if str(hold.get("routeId", "")) == "sam3_pseudo":
+        if str(hold.get("routeId", "")) in {"sam_pseudo", "sam2_pseudo", "sam3_pseudo"}:
             return True
     return False
 

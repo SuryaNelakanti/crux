@@ -52,6 +52,73 @@ def resolve_packaged_model(model_card: Path, card: dict) -> Path:
     return (model_card.parent / model_path).resolve()
 
 
+def resolve_packaged_combo_heads(model_card: Path, card: dict) -> Path:
+    model_info = card.get("files", {}).get("cruxHeads", {})
+    model_path = model_info.get("path")
+    if not isinstance(model_path, str) or not model_path:
+        raise ValueError("files.cruxHeads.path is required")
+    return (model_card.parent / model_path).resolve()
+
+
+def validate_artifact(path: Path, model_info: dict, field: str, issues: list[str]) -> None:
+    if not path.exists():
+        issues.append(f"packaged artifact not found: {path}")
+        return
+    expected_type = "directory" if path.is_dir() else "file"
+    if model_info.get("artifactType") != expected_type:
+        issues.append(f"{field}.artifactType must be {expected_type}")
+    if model_info.get("sha256") != sha256_artifact(path):
+        issues.append(f"{field}.sha256 does not match packaged artifact")
+    if int(model_info.get("bytes") or -1) != artifact_size(path):
+        issues.append(f"{field}.bytes does not match packaged artifact")
+
+
+def validate_common_offline_contract(card: dict, issues: list[str]) -> None:
+    integration = card.get("integration", {})
+    if integration.get("offlineOnly") is not True:
+        issues.append("integration.offlineOnly must be true")
+    if integration.get("networkRequiredForInference") is not False:
+        issues.append("integration.networkRequiredForInference must be false")
+    if integration.get("storeModelHashWithMask") is not True:
+        issues.append("integration.storeModelHashWithMask must be true")
+
+
+def validate_v2_combo(model_card: Path, card: dict, issues: list[str]) -> None:
+    if card.get("family") != "sam-crux-combo":
+        issues.append("family must be sam-crux-combo for schemaVersion 2 combo cards")
+    if card.get("method") != "ml-combo-v1":
+        issues.append("method must be ml-combo-v1 for schemaVersion 2 combo cards")
+    validate_common_offline_contract(card, issues)
+    integration = card.get("integration", {})
+    if integration.get("fallbackPolicy") != "none":
+        issues.append("integration.fallbackPolicy must be none")
+    if integration.get("maskVersionMethod") != "ml-combo-v1":
+        issues.append("integration.maskVersionMethod must be ml-combo-v1")
+
+    primitive = card.get("segmentationPrimitive", {})
+    if primitive.get("family") != "sam-family":
+        issues.append("segmentationPrimitive.family must be sam-family")
+    if primitive.get("frozen") is not True:
+        issues.append("segmentationPrimitive.frozen must be true")
+
+    metrics = card.get("metrics", {})
+    gates = metrics.get("gates", {})
+    required_gates = ["proposalRecall", "holdProposalF1", "bestRouteGroupIou", "autoRouteIou", "p90RuntimeMs"]
+    for gate in required_gates:
+        if gates.get(gate) is not True:
+            issues.append(f"metrics.gates.{gate} must be true")
+    if int(metrics.get("imageCount") or 0) <= 0:
+        issues.append("metrics.imageCount must be positive")
+
+    try:
+        heads = resolve_packaged_combo_heads(model_card, card)
+    except ValueError as error:
+        heads = None
+        issues.append(str(error))
+    if heads is not None:
+        validate_artifact(heads, card.get("files", {}).get("cruxHeads", {}), "files.cruxHeads", issues)
+
+
 def validate(model_card: Path) -> dict:
     issues: list[str] = []
     if not model_card.exists():
@@ -62,22 +129,26 @@ def validate(model_card: Path) -> dict:
         }
 
     card = json.loads(model_card.read_text(encoding="utf-8"))
-    if card.get("schemaVersion") != 1:
-        issues.append("schemaVersion must be 1")
+    schema_version = card.get("schemaVersion")
+    if schema_version not in {1, 2}:
+        issues.append("schemaVersion must be 1 or 2")
+        schema_version = None
+    if schema_version == 2:
+        validate_v2_combo(model_card, card, issues)
+        return {
+            "valid": len(issues) == 0,
+            "modelCard": str(model_card),
+            "issues": issues,
+        }
     if not card.get("family"):
         issues.append("family is required")
     if not card.get("method"):
         issues.append("method is required")
 
     integration = card.get("integration", {})
-    if integration.get("offlineOnly") is not True:
-        issues.append("integration.offlineOnly must be true")
-    if integration.get("networkRequiredForInference") is not False:
-        issues.append("integration.networkRequiredForInference must be false")
+    validate_common_offline_contract(card, issues)
     if not integration.get("fallback"):
         issues.append("integration.fallback is required")
-    if integration.get("storeModelHashWithMask") is not True:
-        issues.append("integration.storeModelHashWithMask must be true")
 
     metrics = card.get("metrics", {})
     gates = metrics.get("gates", {})
@@ -96,16 +167,7 @@ def validate(model_card: Path) -> dict:
 
     if packaged_model is not None:
         model_info = card.get("files", {}).get("model", {})
-        if not packaged_model.exists():
-            issues.append(f"packaged model not found: {packaged_model}")
-        else:
-            expected_type = "directory" if packaged_model.is_dir() else "file"
-            if model_info.get("artifactType") != expected_type:
-                issues.append(f"files.model.artifactType must be {expected_type}")
-            if model_info.get("sha256") != sha256_artifact(packaged_model):
-                issues.append("files.model.sha256 does not match packaged artifact")
-            if int(model_info.get("bytes") or -1) != artifact_size(packaged_model):
-                issues.append("files.model.bytes does not match packaged artifact")
+        validate_artifact(packaged_model, model_info, "files.model", issues)
 
     return {
         "valid": len(issues) == 0,

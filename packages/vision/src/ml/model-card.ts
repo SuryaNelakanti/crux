@@ -1,4 +1,6 @@
-export interface RouteMaskModelCard {
+export type RouteMaskModelCard = RouteMaskModelCardV1 | RouteMaskComboModelCard;
+
+export interface RouteMaskModelCardV1 {
   schemaVersion: 1;
   family: string;
   method: string;
@@ -44,6 +46,68 @@ export interface RouteMaskModelCard {
   };
 }
 
+export interface RouteMaskComboModelCard {
+  schemaVersion: 2;
+  family: 'sam-crux-combo';
+  method: 'ml-combo-v1';
+  segmentationPrimitive: {
+    family: 'sam-family';
+    name: string;
+    frozen: true;
+    prompt?: string;
+  };
+  files: {
+    cruxHeads: ModelArtifact;
+    samPrimitive?: Omit<Partial<ModelArtifact>, 'artifactType'> & {
+      path: string;
+      artifactType?: 'file' | 'directory' | 'external-missing';
+    };
+    datasetManifest?: HashReference;
+    evalSummary?: HashReference;
+    proposalSummary?: HashReference;
+  };
+  thresholds: {
+    hold: number;
+  };
+  metrics: {
+    imageCount: number;
+    proposalRecall?: number;
+    holdProposal?: {
+      precision?: number;
+      recall?: number;
+      f1?: number;
+    };
+    allHold?: {
+      recall?: number;
+      f1?: number;
+    };
+    bestRouteGroupIou?: number;
+    autoRouteIou?: number;
+    runtimeMs?: {
+      p50?: number;
+      p90?: number;
+    };
+    gates: {
+      proposalRecall: boolean;
+      holdProposalF1: boolean;
+      bestRouteGroupIou: boolean;
+      autoRouteIou: boolean;
+      p90RuntimeMs: boolean;
+    };
+  };
+  integration: {
+    offlineOnly: true;
+    fallbackPolicy: 'none';
+    maskVersionMethod: 'ml-combo-v1';
+    storeModelHashWithMask: true;
+    networkRequiredForInference: false;
+  };
+  license?: {
+    requiresReviewBeforeDistribution?: boolean;
+    notes?: string;
+  };
+}
+
 export interface ModelArtifact {
   path: string;
   sha256: string;
@@ -73,7 +137,8 @@ export interface RouteMaskModelMetadata {
 
 export function validateRouteMaskModelCard(value: unknown): RouteMaskModelCard {
   if (!isRecord(value)) throw new Error('Model card must be an object');
-  if (value.schemaVersion !== 1) throw new Error('Model card schemaVersion must be 1');
+  if (value.schemaVersion === 2) return validateComboModelCard(value);
+  if (value.schemaVersion !== 1) throw new Error('Model card schemaVersion must be 1 or 2');
   const family = requireString(value.family, 'family');
   const method = requireString(value.method, 'method');
 
@@ -174,6 +239,22 @@ export function validateRouteMaskModelCard(value: unknown): RouteMaskModelCard {
 }
 
 export function modelMetadataFromCard(card: RouteMaskModelCard): RouteMaskModelMetadata {
+  if (card.schemaVersion === 2) {
+    return {
+      method: card.integration.maskVersionMethod,
+      family: card.family,
+      modelHash: card.files.cruxHeads.sha256,
+      modelBytes: card.files.cruxHeads.bytes,
+      imageSize: 0,
+      validation: {
+        imageCount: card.metrics.imageCount,
+        allHoldRecall: card.metrics.allHold?.recall,
+        bestRouteGroupIou: card.metrics.bestRouteGroupIou,
+        autoRouteIou: card.metrics.autoRouteIou,
+        p90RuntimeMs: card.metrics.runtimeMs?.p90,
+      },
+    };
+  }
   return {
     method: card.integration.maskVersionMethod,
     family: card.family,
@@ -187,6 +268,132 @@ export function modelMetadataFromCard(card: RouteMaskModelCard): RouteMaskModelM
       autoRouteIou: card.metrics.autoRouteIou,
       p90RuntimeMs: card.metrics.runtimeMs?.p90,
     },
+  };
+}
+
+function validateComboModelCard(value: Record<string, unknown>): RouteMaskComboModelCard {
+  if (value.family !== 'sam-crux-combo') {
+    throw new Error('family must be sam-crux-combo for schemaVersion 2');
+  }
+  if (value.method !== 'ml-combo-v1') {
+    throw new Error('method must be ml-combo-v1 for schemaVersion 2');
+  }
+  const primitive = requireRecord(value.segmentationPrimitive, 'segmentationPrimitive');
+  if (primitive.family !== 'sam-family') throw new Error('segmentationPrimitive.family must be sam-family');
+  if (primitive.frozen !== true) throw new Error('segmentationPrimitive.frozen must be true');
+  const files = requireRecord(value.files, 'files');
+  const cruxHeads = parseModelArtifact(files.cruxHeads, 'files.cruxHeads');
+  const thresholds = requireRecord(value.thresholds, 'thresholds');
+  const holdThreshold = requirePositiveNumber(thresholds.hold, 'thresholds.hold');
+  const metrics = requireRecord(value.metrics, 'metrics');
+  const gates = requireRecord(metrics.gates, 'metrics.gates');
+  for (const gate of [
+    'proposalRecall',
+    'holdProposalF1',
+    'bestRouteGroupIou',
+    'autoRouteIou',
+    'p90RuntimeMs',
+  ]) {
+    if (gates[gate] !== true) throw new Error(`metrics.gates.${gate} must be true`);
+  }
+  const integration = requireRecord(value.integration, 'integration');
+  if (integration.offlineOnly !== true) throw new Error('integration.offlineOnly must be true');
+  if (integration.networkRequiredForInference !== false) {
+    throw new Error('integration.networkRequiredForInference must be false');
+  }
+  if (integration.storeModelHashWithMask !== true) {
+    throw new Error('integration.storeModelHashWithMask must be true');
+  }
+  if (integration.fallbackPolicy !== 'none') throw new Error('integration.fallbackPolicy must be none');
+  if (integration.maskVersionMethod !== 'ml-combo-v1') {
+    throw new Error('integration.maskVersionMethod must be ml-combo-v1');
+  }
+  const imageCount = requirePositiveNumber(metrics.imageCount, 'metrics.imageCount');
+
+  return {
+    schemaVersion: 2,
+    family: 'sam-crux-combo',
+    method: 'ml-combo-v1',
+    segmentationPrimitive: {
+      family: 'sam-family',
+      name: requireString(primitive.name, 'segmentationPrimitive.name'),
+      frozen: true,
+      prompt: typeof primitive.prompt === 'string' ? primitive.prompt : undefined,
+    },
+    files: {
+      cruxHeads,
+      samPrimitive: isRecord(files.samPrimitive)
+        ? {
+            path: requireString(files.samPrimitive.path, 'files.samPrimitive.path'),
+            sha256: typeof files.samPrimitive.sha256 === 'string' ? files.samPrimitive.sha256 : undefined,
+            bytes: typeof files.samPrimitive.bytes === 'number' ? files.samPrimitive.bytes : undefined,
+            artifactType:
+              files.samPrimitive.artifactType === 'file' ||
+              files.samPrimitive.artifactType === 'directory' ||
+              files.samPrimitive.artifactType === 'external-missing'
+                ? files.samPrimitive.artifactType
+                : undefined,
+          }
+        : undefined,
+      datasetManifest: isRecord(files.datasetManifest)
+        ? parseHashReference(files.datasetManifest, 'files.datasetManifest')
+        : undefined,
+      evalSummary: isRecord(files.evalSummary)
+        ? parseHashReference(files.evalSummary, 'files.evalSummary')
+        : undefined,
+      proposalSummary: isRecord(files.proposalSummary)
+        ? parseHashReference(files.proposalSummary, 'files.proposalSummary')
+        : undefined,
+    },
+    thresholds: { hold: holdThreshold },
+    metrics: {
+      imageCount,
+      proposalRecall: optionalNumber(metrics.proposalRecall),
+      holdProposal: isRecord(metrics.holdProposal)
+        ? {
+            precision: optionalNumber(metrics.holdProposal.precision),
+            recall: optionalNumber(metrics.holdProposal.recall),
+            f1: optionalNumber(metrics.holdProposal.f1),
+          }
+        : undefined,
+      allHold: isRecord(metrics.allHold)
+        ? {
+            recall: optionalNumber(metrics.allHold.recall),
+            f1: optionalNumber(metrics.allHold.f1),
+          }
+        : undefined,
+      bestRouteGroupIou: optionalNumber(metrics.bestRouteGroupIou),
+      autoRouteIou: optionalNumber(metrics.autoRouteIou),
+      runtimeMs: isRecord(metrics.runtimeMs)
+        ? {
+            p50: optionalNumber(metrics.runtimeMs.p50),
+            p90: optionalNumber(metrics.runtimeMs.p90),
+          }
+        : undefined,
+      gates: {
+        proposalRecall: true,
+        holdProposalF1: true,
+        bestRouteGroupIou: true,
+        autoRouteIou: true,
+        p90RuntimeMs: true,
+      },
+    },
+    integration: {
+      offlineOnly: true,
+      fallbackPolicy: 'none',
+      maskVersionMethod: 'ml-combo-v1',
+      storeModelHashWithMask: true,
+      networkRequiredForInference: false,
+    },
+    license: isRecord(value.license)
+      ? {
+          requiresReviewBeforeDistribution:
+            typeof value.license.requiresReviewBeforeDistribution === 'boolean'
+              ? value.license.requiresReviewBeforeDistribution
+              : undefined,
+          notes: typeof value.license.notes === 'string' ? value.license.notes : undefined,
+        }
+      : undefined,
   };
 }
 

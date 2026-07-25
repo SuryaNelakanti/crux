@@ -566,6 +566,128 @@ class CommonPipelineTests(unittest.TestCase):
 
             self.assertTrue(module.validate(card_path)["valid"])
 
+    def test_combo_dataset_builder_matches_proposals_to_manual_holds(self) -> None:
+        from importlib.util import module_from_spec, spec_from_file_location
+
+        combo_path = Path(__file__).with_name("combo_utils.py")
+        spec = spec_from_file_location("combo_utils", combo_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = module_from_spec(spec)
+        sys.modules["combo_utils"] = module
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "wall.png"
+            Image.new("RGB", (20, 20), (120, 120, 120)).save(image)
+            entry = type(
+                "Entry",
+                (),
+                {
+                    "id": "wall",
+                    "image_path": image,
+                    "holds": [
+                        type(
+                            "Hold",
+                            (),
+                            {
+                                "polygon": [{"x": 2, "y": 2}, {"x": 8, "y": 2}, {"x": 8, "y": 8}, {"x": 2, "y": 8}],
+                                "route_id": "red",
+                            },
+                        )()
+                    ],
+                    "split": "train",
+                },
+            )()
+            proposal_rows = [
+                {
+                    "id": "wall",
+                    "proposals": [
+                        {
+                            "confidence": 0.9,
+                            "polygon": [{"x": 2, "y": 2}, {"x": 8, "y": 2}, {"x": 8, "y": 8}, {"x": 2, "y": 8}],
+                        }
+                    ],
+                }
+            ]
+
+            rows, summary = module.build_proposal_dataset_rows([entry], proposal_rows)
+
+        self.assertEqual(rows[0]["label"], "hold")
+        self.assertEqual(rows[0]["matchedRouteId"], "red")
+        self.assertEqual(summary["proposalRecall"], 1.0)
+
+    def test_validate_combo_model_card_v2(self) -> None:
+        from importlib.util import module_from_spec, spec_from_file_location
+
+        validator_path = Path(__file__).with_name("validate-model-card.py")
+        spec = spec_from_file_location("validate_model_card", validator_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            heads = root / "combo-heads.onnx"
+            heads.write_text("heads", encoding="utf-8")
+            card = {
+                "schemaVersion": 2,
+                "family": "sam-crux-combo",
+                "method": "ml-combo-v1",
+                "segmentationPrimitive": {"family": "sam-family", "name": "sam3", "frozen": True},
+                "files": {
+                    "cruxHeads": {
+                        "path": heads.name,
+                        "sha256": module.sha256_artifact(heads),
+                        "bytes": module.artifact_size(heads),
+                        "artifactType": "file",
+                    }
+                },
+                "thresholds": {"hold": 0.5},
+                "metrics": {
+                    "imageCount": 1,
+                    "gates": {
+                        "proposalRecall": True,
+                        "holdProposalF1": True,
+                        "bestRouteGroupIou": True,
+                        "autoRouteIou": True,
+                        "p90RuntimeMs": True,
+                    },
+                },
+                "integration": {
+                    "offlineOnly": True,
+                    "fallbackPolicy": "none",
+                    "maskVersionMethod": "ml-combo-v1",
+                    "storeModelHashWithMask": True,
+                    "networkRequiredForInference": False,
+                },
+            }
+            card_path = root / "model-card.json"
+            card_path.write_text(json.dumps(card), encoding="utf-8")
+
+            self.assertTrue(module.validate(card_path)["valid"])
+
+    def test_check_pipeline_validates_combo_proposal_rows(self) -> None:
+        from importlib.util import module_from_spec, spec_from_file_location
+
+        script_path = Path(__file__).with_name("check-pipeline.py")
+        spec = spec_from_file_location("check_pipeline_combo", script_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            good = Path(tmp) / "good.jsonl"
+            bad = Path(tmp) / "bad.jsonl"
+            good.write_text(json.dumps({"id": "a", "split": "train", "labelSource": "reviewed-sam3"}) + "\n")
+            bad.write_text(json.dumps({"id": "b", "split": "val", "labelSource": "reviewed-sam3"}) + "\n")
+
+            self.assertTrue(module.validate_combo_proposals(good))
+            self.assertFalse(module.validate_combo_proposals(bad))
+
     def test_validate_dataset_reports_manifest_quality(self) -> None:
         from importlib.util import module_from_spec, spec_from_file_location
 

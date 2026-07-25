@@ -9,10 +9,13 @@ from _common import build_parser, load_manifest, stable_split, write_jsonl
 
 
 def parse_args():
-    parser = build_parser("Merge reviewed SAM3 proposal polygons into a train-only augmented manifest.")
+    parser = build_parser("Merge reviewed SAM-family proposal polygons into a train-only augmented manifest.")
     parser.add_argument("--base-manifest", default=".data/vision/heidelberg/manifest.jsonl")
     parser.add_argument("--reviewed", required=True, help="Reviewed proposals JSON or VIA JSON.")
     parser.add_argument("--out", default=".data/vision/heidelberg-sam3-train/manifest.jsonl")
+    parser.add_argument("--pseudo-prefix", default="sam3")
+    parser.add_argument("--pseudo-source", default="reviewed-sam3")
+    parser.add_argument("--pseudo-route-id", default="sam_pseudo")
     parser.add_argument("--min-polygons", type=int, default=1)
     parser.add_argument("--train", type=float, default=0.8)
     parser.add_argument("--val", type=float, default=0.1)
@@ -36,7 +39,7 @@ def polygon_from_shape(shape: dict) -> list[dict[str, float]] | None:
     return [{"x": float(x), "y": float(ys[index])} for index, x in enumerate(xs)]
 
 
-def load_reviewed_rows(path: Path) -> list[dict]:
+def load_reviewed_rows(path: Path, pseudo_source: str = "reviewed-sam3") -> list[dict]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     if isinstance(raw, list):
         return [row for row in raw if is_record(row)]
@@ -62,7 +65,7 @@ def load_reviewed_rows(path: Path) -> list[dict]:
                     continue
                 polygon = polygon_from_shape(region["shape_attributes"])
                 if polygon is not None:
-                    proposals.append({"polygon": polygon, "source": "reviewed-sam3"})
+                    proposals.append({"polygon": polygon, "source": pseudo_source})
             rows.append(
                 {
                     "id": str(entry.get("id") or Path(str(entry.get("filename", ""))).stem),
@@ -130,7 +133,14 @@ def manual_row(entry, split: str | None = None) -> dict:
     }
 
 
-def proposal_row(row: dict, image_path: Path, index: int) -> dict | None:
+def proposal_row(
+    row: dict,
+    image_path: Path,
+    index: int,
+    pseudo_prefix: str = "sam3",
+    pseudo_source: str = "reviewed-sam3",
+    pseudo_route_id: str = "sam3_pseudo",
+) -> dict | None:
     proposals = row.get("proposals")
     if not isinstance(proposals, list):
         return None
@@ -148,9 +158,9 @@ def proposal_row(row: dict, image_path: Path, index: int) -> dict | None:
             {
                 "id": len(holds),
                 "polygon": polygon,
-                "routeId": "sam3_pseudo",
-                "routeLabel": "sam3_pseudo",
-                "labelSource": str(proposal.get("source", "reviewed-sam3")),
+                "routeId": str(proposal.get("routeId", pseudo_route_id)),
+                "routeLabel": str(proposal.get("routeLabel", pseudo_route_id)),
+                "labelSource": str(proposal.get("source", pseudo_source)),
             }
         )
     if not holds:
@@ -158,14 +168,14 @@ def proposal_row(row: dict, image_path: Path, index: int) -> dict | None:
     source_id = str(row.get("id") or image_path.stem)
     hold_ids = [hold["id"] for hold in holds]
     return {
-        "id": f"sam3_{source_id}_{index}",
+        "id": f"{pseudo_prefix}_{source_id}_{index}",
         "split": "train",
         "imagePath": str(image_path),
         "width": width,
         "height": height,
-        "labelSource": "reviewed-sam3",
+        "labelSource": pseudo_source,
         "holds": holds,
-        "routes": [{"id": "sam3_pseudo", "label": "sam3_pseudo", "holdIds": hold_ids}],
+        "routes": [{"id": pseudo_route_id, "label": pseudo_route_id, "holdIds": hold_ids}],
     }
 
 
@@ -188,7 +198,7 @@ def run() -> None:
         for split_name, entries in split_entries.items():
             base_split_counts[split_name] = len(entries)
             rows.extend(manual_row(entry, split_name) for entry in entries)
-    reviewed_rows = load_reviewed_rows(reviewed_path)
+    reviewed_rows = load_reviewed_rows(reviewed_path, args.pseudo_source)
     added = 0
     skipped = 0
     for index, row in enumerate(reviewed_rows):
@@ -196,7 +206,7 @@ def run() -> None:
         if image_path is None:
             skipped += 1
             continue
-        merged = proposal_row(row, image_path, index)
+        merged = proposal_row(row, image_path, index, args.pseudo_prefix, args.pseudo_source, args.pseudo_route_id)
         if merged is None or len(merged["holds"]) < args.min_polygons:
             skipped += 1
             continue
@@ -216,7 +226,7 @@ def run() -> None:
         "reviewedRowsSkipped": skipped,
         "baseSplitCounts": base_split_counts,
         "splitCounts": split_counts,
-        "labelPolicy": "manual base rows use stable or preserved splits; reviewed SAM3 proposals train-only",
+        "labelPolicy": "manual base rows use stable or preserved splits; reviewed SAM-family proposals train-only",
     }
     (out.parent / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
     print(json.dumps(summary, indent=2, sort_keys=True))

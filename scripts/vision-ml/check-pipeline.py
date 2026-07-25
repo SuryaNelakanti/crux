@@ -20,6 +20,8 @@ def parse_args():
     parser.add_argument("--model-card", default=".models/vision/crux-route-mask-model/model-card.json")
     parser.add_argument("--environment-report", default="scripts/output/vision-ml/environment.json")
     parser.add_argument("--augmented-manifest", default=None)
+    parser.add_argument("--combo-proposal-rows", default=None)
+    parser.add_argument("--combo-heads", default=None)
     parser.add_argument("--out", default="scripts/output/vision-ml/pipeline-audit.json")
     parser.add_argument("--strict", action="store_true")
     return parser.parse_args()
@@ -49,6 +51,21 @@ def validate_augmented_manifest(path: Path | None) -> bool | None:
     return bool(module.validate(path)["valid"])
 
 
+def validate_combo_proposals(path: Path | None) -> bool | None:
+    if path is None:
+        return None
+    if not path.exists():
+        return False
+    with path.open("r", encoding="utf-8") as handle:
+        rows = [json.loads(line) for line in handle if line.strip()]
+    for row in rows:
+        source = str(row.get("labelSource", "manual"))
+        split = str(row.get("split", "all"))
+        if source in {"reviewed-sam3", "sam3-proposal", "sam3_pseudo"} and split != "train":
+            return False
+    return len(rows) > 0
+
+
 def run() -> None:
     args = parse_args()
     manifest = Path(args.manifest).resolve()
@@ -59,9 +76,12 @@ def run() -> None:
     model_card = Path(args.model_card).resolve()
     environment_report = Path(args.environment_report).resolve()
     augmented_manifest = Path(args.augmented_manifest).resolve() if args.augmented_manifest else None
+    combo_proposal_rows = Path(args.combo_proposal_rows).resolve() if args.combo_proposal_rows else None
+    combo_heads = Path(args.combo_heads).resolve() if args.combo_heads else None
     eval_summary = read_eval_summary(eval_summary_path)
     eval_gates = eval_summary.get("gates", {}) if eval_summary else {}
     augmented_manifest_valid = validate_augmented_manifest(augmented_manifest)
+    combo_proposals_valid = validate_combo_proposals(combo_proposal_rows)
     model_card_valid = False
     if model_card.exists():
         import importlib.util
@@ -89,6 +109,8 @@ def run() -> None:
             "exportedModel": exported_model.exists() if exported_model else False,
             "modelCard": model_card.exists(),
             "environmentReport": environment_report.exists(),
+            "comboProposalRows": combo_proposal_rows.exists() if combo_proposal_rows else None,
+            "comboHeads": combo_heads.exists() if combo_heads else None,
         },
         "promotionGates": {
             "hasImages": bool(eval_summary and int(eval_summary.get("imageCount", 0)) > 0),
@@ -105,14 +127,22 @@ def run() -> None:
             "manifestExists": augmented_manifest.exists() if augmented_manifest else None,
             "trainOnlyPseudoLabels": augmented_manifest_valid,
         },
+        "comboData": {
+            "notProvided": combo_proposal_rows is None,
+            "proposalRowsExist": combo_proposal_rows.exists() if combo_proposal_rows else None,
+            "trainOnlyPseudoLabels": combo_proposals_valid,
+            "headsExist": combo_heads.exists() if combo_heads else None,
+        },
     }
     augmented_ready = augmented_manifest_valid is not False
+    combo_ready = combo_proposals_valid is not False and (combo_heads is None or combo_heads.exists())
     ready = (
         all(checks["dependencies"].values())
-        and all(checks["artifacts"].values())
+        and all(value is not False for value in checks["artifacts"].values())
         and all(checks["promotionGates"].values())
         and all(checks["integrationPackage"].values())
         and augmented_ready
+        and combo_ready
     )
     audit = {
         "readyForIntegration": ready,
@@ -126,6 +156,8 @@ def run() -> None:
             "modelCard": str(model_card),
             "environmentReport": str(environment_report),
             "augmentedManifest": str(augmented_manifest) if augmented_manifest else None,
+            "comboProposalRows": str(combo_proposal_rows) if combo_proposal_rows else None,
+            "comboHeads": str(combo_heads) if combo_heads else None,
         },
     }
 

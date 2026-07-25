@@ -96,4 +96,65 @@ describe('route mask model card', () => {
       })
     ).toThrow('metrics.gates.autoRouteIou must be true');
   });
+
+  it('validates a SAM+Crux combo model card without fallback policy', () => {
+    const card = validateRouteMaskModelCard({
+      schemaVersion: 2,
+      family: 'sam-crux-combo',
+      method: 'ml-combo-v1',
+      segmentationPrimitive: {
+        family: 'sam-family',
+        name: 'sam3',
+        frozen: true,
+        prompt: 'climbing hold',
+      },
+      files: {
+        cruxHeads: {
+          path: 'combo-heads.onnx',
+          sha256: hash,
+          bytes: 456,
+          artifactType: 'file',
+        },
+      },
+      thresholds: { hold: 0.5 },
+      metrics: {
+        imageCount: 3,
+        proposalRecall: 0.95,
+        holdProposal: { f1: 0.86 },
+        allHold: { recall: 0.93, f1: 0.84 },
+        bestRouteGroupIou: 0.79,
+        autoRouteIou: 0.7,
+        runtimeMs: { p90: 900 },
+        gates: {
+          proposalRecall: true,
+          holdProposalF1: true,
+          bestRouteGroupIou: true,
+          autoRouteIou: true,
+          p90RuntimeMs: true,
+        },
+      },
+      integration: {
+        offlineOnly: true,
+        fallbackPolicy: 'none',
+        maskVersionMethod: 'ml-combo-v1',
+        storeModelHashWithMask: true,
+        networkRequiredForInference: false,
+      },
+    });
+    const metadata = modelMetadataFromCard(card);
+
+    expect(metadata).toMatchObject({
+      method: 'ml-combo-v1',
+      family: 'sam-crux-combo',
+      modelHash: hash,
+      modelBytes: 456,
+      validation: {
+        imageCount: 3,
+        allHoldRecall: 0.93,
+        bestRouteGroupIou: 0.79,
+        autoRouteIou: 0.7,
+        p90RuntimeMs: 900,
+      },
+    });
+  });
 });

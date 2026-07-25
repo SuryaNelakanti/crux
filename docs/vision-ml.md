@@ -208,6 +208,22 @@ against `.data/vision/heidelberg-yolo/crux-manifest.jsonl` with
 `evaluate-yolo-tiles.py`, so all validation and test metrics continue to come
 from manually reviewed labels.
 
+If SAM3 weights are unavailable, use SAM2 as a bbox-prompted annotation
+refiner over the existing trusted train split. Place the checkpoint under
+`.models/vision/teachers`, generate train-only refined polygons, then merge and
+tile them for a student fine-tune:
+
+```bash
+.venv-vision-ml/Scripts/python scripts/vision-ml/propose-sam2-labels.py --manifest .data/vision/heidelberg-yolo/crux-manifest.jsonl --model .models/vision/teachers/sam2.1_t.pt --out scripts/output/vision-ml/sam2-proposals --device 0 --splits train --batch-size 32 --preview
+.venv-vision-ml/Scripts/python scripts/vision-ml/merge-reviewed-proposals.py --base-manifest .data/vision/heidelberg-yolo/crux-manifest.jsonl --reviewed scripts/output/vision-ml/sam2-proposals/proposals.json --out .data/vision/heidelberg-sam2-train/manifest.jsonl --preserve-base-splits --pseudo-prefix sam2 --pseudo-source reviewed-sam2 --pseudo-route-id sam2_pseudo
+.venv-vision-ml/Scripts/python scripts/vision-ml/validate-augmented-manifest.py --manifest .data/vision/heidelberg-sam2-train/manifest.jsonl --strict
+.venv-vision-ml/Scripts/python scripts/vision-ml/prepare-yolo-tiles.py --manifest .data/vision/heidelberg-sam2-train/manifest.jsonl --out .data/vision/heidelberg-sam2-yolo-tiles --tile-size 1024 --overlap 384 --preserve-splits
+```
+
+SAM2-refined labels are still pseudo-labels. Keep them train-only and promote a
+student checkpoint only if route-mask evaluation beats the current packaged
+baseline on manual validation/test splits.
+
 Validate the normalized manifest before converting:
 
 ```bash
@@ -691,6 +707,41 @@ Then review the proposals, merge reviewed polygons into train-only data, and
 retrain the tiled YOLO route-mask model. Prioritize the current phone-image
 detection failures first, because scorer tuning cannot recover routes when the
 hold detector misses most holds.
+
+## SAM+Crux Combo Model
+
+The combo path uses SAM3 as a frozen proposal splitter and trains Crux-owned
+heads for hold filtering, route embeddings, and no-tap route selection. This is
+the primary path for `ml-combo-v1`; deterministic masking remains a benchmark
+and debugging comparator.
+
+Build the proposal dataset from existing or newly generated SAM3 proposals:
+
+```bash
+.venv-vision-ml/Scripts/python scripts/vision-ml/build-sam-proposal-dataset.py --manifest .data/vision/heidelberg/manifest.jsonl --raw-source .data/raw/heidelberg --model .models/vision/teachers/sam3.pt --out .data/vision/heidelberg-sam3-combo-proposals --preview
+```
+
+Train and export the Crux heads:
+
+```bash
+.venv-vision-ml/Scripts/python scripts/vision-ml/train-combo-heads.py --proposal-rows .data/vision/heidelberg-sam3-combo-proposals/proposals.jsonl --out .models/vision/crux-combo-heads-v1 --device 0
+.venv-vision-ml/Scripts/python scripts/vision-ml/export-combo-heads.py --checkpoint .models/vision/crux-combo-heads-v1/combo-heads.pt --out .models/vision/crux-combo-heads-v1/onnx
+```
+
+Evaluate, package, and validate only after gates pass:
+
+```bash
+.venv-vision-ml/Scripts/python scripts/vision-ml/evaluate-combo-route.py --proposal-rows .data/vision/heidelberg-sam3-combo-proposals/proposals.jsonl --manifest .data/vision/heidelberg/manifest.jsonl --crux-heads .models/vision/crux-combo-heads-v1/onnx/combo-heads.onnx --split val --out scripts/output/vision-ml/eval-combo-route
+.venv-vision-ml/Scripts/python scripts/vision-ml/package-combo-model.py --crux-heads .models/vision/crux-combo-heads-v1/onnx/combo-heads.onnx --sam-model .models/vision/teachers/sam3.pt --eval-summary scripts/output/vision-ml/eval-combo-route/summary.json --proposal-summary .data/vision/heidelberg-sam3-combo-proposals/summary.json --dataset-manifest .data/vision/heidelberg/manifest.jsonl --out .models/vision/crux-route-mask-combo-v1
+.venv-vision-ml/Scripts/python scripts/vision-ml/validate-model-card.py --model-card .models/vision/crux-route-mask-combo-v1/model-card.json --strict
+```
+
+Single-image combo QA requires the packaged model card and a SAM proposal file
+containing the target image:
+
+```bash
+.venv-vision-ml/Scripts/python scripts/vision-ml/infer-combo-route.py --image path/to/photo.jpg --model-card .models/vision/crux-route-mask-combo-v1/model-card.json --sam-proposals scripts/output/vision-ml/sam3-proposals/proposals.json --out scripts/output/vision-ml/infer-combo
+```
 
 Seed a route group by tap position:
 

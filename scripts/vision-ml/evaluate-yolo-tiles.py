@@ -23,6 +23,7 @@ from _common import (
     median_color_hsl,
     percentile,
     rasterize_polygons,
+    route_group_selection_score,
     select_route_group,
     weighted_average_hsl,
     write_jsonl,
@@ -127,6 +128,9 @@ def group_tiled_instances_by_color(instances: list[TiledInstance], size: tuple[i
         group_instances = list(group["instances"])
         area = sum(instance.area for instance in group_instances)
         score = sum(instance.confidence * np.sqrt(max(1, instance.area)) for instance in group_instances)
+        mask = union_tiled_masks(group_instances, size)
+        bbox = mask.getbbox() or (0, 0, 1, 1)
+        selection = route_group_selection_score(area, len(group_instances), group["color"], bbox, size, float(score))
         groups.append(
             PredictedGroup(
                 id=len(groups),
@@ -134,7 +138,10 @@ def group_tiled_instances_by_color(instances: list[TiledInstance], size: tuple[i
                 color=group["color"],
                 area=area,
                 score=float(score),
-                mask=union_tiled_masks(group_instances, size),
+                mask=mask,
+                bbox=bbox,
+                instance_count=len(group_instances),
+                selection=selection,
             )
         )
 
@@ -147,6 +154,9 @@ def group_tiled_instances_by_color(instances: list[TiledInstance], size: tuple[i
             area=group.area,
             score=group.score,
             mask=group.mask,
+            bbox=group.bbox,
+            instance_count=group.instance_count,
+            selection=group.selection,
         )
         for index, group in enumerate(sorted_groups)
     ]
