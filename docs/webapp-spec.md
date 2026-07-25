@@ -13,10 +13,11 @@
 ## Primary Flows
 1. Auth (email magic link)
    - Enter email -> receive magic link -> session is created in-app.
-2. Session list
-   - List recent sessions with counts and status.
-   - Start session button.
-   - Quick capture: create a new session and upload a photo in one step.
+2. Tonight / journal
+   - Open directly into the active session film when one exists.
+   - Keep route photography ahead of counts and session management.
+   - Keep capture in a persistent thumb-reach dock.
+   - Show finished sessions as a secondary journal.
 3. Session detail
    - Upload problem photo.
    - List problems with outcome + grade chips.
@@ -56,11 +57,15 @@
 - Save writes a new mask version and uploads PNG.
 
 ## UI System
-- Custom CSS variables for color, spacing, radius, and motion.
-- High-contrast, premium aesthetic with subtle gradients and hand-drawn accents.
-- Motion: page reveal, list stagger, hover depth (CSS keyframes).
+- shadcn/ui Nova components with scoped Radix primitives and Lucide icons.
+- Tailwind CSS v4 with semantic OKLCH tokens, Geist typography, 8px default radius, and a restrained dark neutral palette.
+- Camera-first consumer composition: active session film first, journal second, no analytics dashboard.
+- Route photos carry the hierarchy. Borders and spacing define structure; gradients, doodles, glass effects, and decorative motion are excluded.
+- Motion is limited to 150-200ms interaction feedback and respects reduced-motion preferences.
 
 ## Environment
+- `VITE_DATA_MODE=mock` for the default local browser demo.
+- `VITE_DATA_MODE=supabase` for integration testing.
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 
@@ -72,3 +77,7 @@
 The web MVP is centered on **Log a climb** rather than a session dashboard. From Home, Log a climb reuses an active session when one exists or starts a new session, opens capture, uploads the photo, generates the automatic heuristic route mask, and lands on the captured-photo outcome screen. Flash, Sent, or Tried save immediately through the append-only event path and return to the active session. There is no default outcome and no separate Save step for the core flow.
 
 Mask correction is named **Fix route** and is progressively disclosed by low confidence or explicit user request. Attempts, grade, and notes are optional details below the outcome controls.
+
+## 2026-07-25 Consumer UI Update
+
+The web shell is mobile-first and image-led. Home is **Tonight**, not a sessions dashboard. It shows the current session film, keeps Capture in a bottom dock, and moves finished sessions into the secondary Journal section. Desktop retains the same consumer composition at a readable content width rather than expanding into dashboard cards.

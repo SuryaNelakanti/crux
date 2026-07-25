@@ -2,6 +2,18 @@
 
 Use this checklist when reviewing UI changes to maintain CRED-level quality.
 
+## Web Product UI
+
+- [ ] **Registry primitives** - Standard controls use shadcn/ui components, scoped Radix packages, and Lucide icons.
+- [ ] **Consumer composition** - The active session film leads; session management and history remain secondary.
+- [ ] **Semantic theme** - Colors use OKLCH theme tokens and one restrained brand accent.
+- [ ] **Geist typography** - Application text uses Geist with a 14px base and no more than three weights per page.
+- [ ] **8-point rhythm** - Page spacing follows 4, 8, 12, 16, 24, 32, 48, and 64px increments.
+- [ ] **8px radius** - Controls and surfaces use the shared radius instead of isolated pill or oversized-card styling.
+- [ ] **Complete states** - Populated, empty, loading, error, disabled, active, hover, and visible-focus states are present.
+- [ ] **Responsive intent** - Capture remains reachable on mobile, route media remains primary, and desktop does not become a dashboard.
+- [ ] **Reduced motion** - Product transitions are short, purposeful, and disabled when reduced motion is requested.
+
 ---
 
 ## Spacing and Layout

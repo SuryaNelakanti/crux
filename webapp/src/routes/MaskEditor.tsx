@@ -1,8 +1,14 @@
 import { type HSL, rgbToHsl } from '@crux/vision';
+import { ArrowLeft, Brush, Eraser, Focus, LoaderCircle, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { DoodleScribble } from '@/components/Doodle';
-import { Button, Segmented } from '@/components/ui';
+import { toast } from 'sonner';
+import { AppShell } from '@/components/AppShell';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { fetchProblemDetail, saveMaskVersion } from '@/lib/api';
 import {
   buildRouteMaskForCluster,
@@ -23,6 +29,8 @@ export function MaskEditorRoute() {
   const offscreenRef = useRef<HTMLCanvasElement | null>(null);
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [maskData, setMaskData] = useState<Uint8Array | null>(null);
   const [rgbaData, setRgbaData] = useState<Uint8Array | null>(null);
   const [maskSize, setMaskSize] = useState<{ width: number; height: number } | null>(null);
@@ -343,48 +351,59 @@ export function MaskEditorRoute() {
   useEffect(() => {
     const load = async () => {
       if (!problemId) return;
-      const detail = await fetchProblemDetail(problemId);
-      if (!detail) return;
-      setSessionId(detail.sessionId);
-      setPhotoUrl(detail.imageUrl);
-      if (
-        detail.maskMethod === 'auto' ||
-        detail.maskMethod === 'seed-color' ||
-        detail.maskMethod === 'manual-edit' ||
-        detail.maskMethod === 'color-dominant'
-      ) {
-        setMaskMeta({ method: detail.maskMethod, confidence: detail.maskConfidence });
-      } else {
-        setMaskMeta({ method: 'manual-edit' });
-      }
-
-      if (detail.maskUrl) {
-        const loaded = await loadMaskPixelsFromUrl(detail.maskUrl);
-        setMaskData(loaded.mask);
-        setRgbaData(loaded.rgba);
-        setMaskSize({ width: loaded.width, height: loaded.height });
-        if (detail.imageUrl) {
-          const detection = await detectHoldsFromPhoto({
-            uri: detail.imageUrl,
-            maxWidth: loaded.width,
-          });
-          setHoldDetection(detection);
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const detail = await fetchProblemDetail(problemId);
+        if (!detail) {
+          setLoadError('This climb could not be loaded.');
+          return;
         }
-      } else if (detail.imageUrl) {
-        const img = await loadImageDimensions(detail.imageUrl);
-        const targetWidth = Math.min(img.width, 1200);
-        const scale = targetWidth / img.width;
-        const targetHeight = Math.round(img.height * scale);
-        const detection = await detectHoldsFromPhoto({
-          uri: detail.imageUrl,
-          maxWidth: targetWidth,
-        });
-        setHoldDetection(detection);
-        setMaskData(new Uint8Array(detection.width * detection.height));
-        setMaskSize({ width: detection.width, height: detection.height });
-        if (img.width !== targetWidth || img.height !== targetHeight) {
+        setSessionId(detail.sessionId);
+        setPhotoUrl(detail.imageUrl);
+        if (
+          detail.maskMethod === 'auto' ||
+          detail.maskMethod === 'seed-color' ||
+          detail.maskMethod === 'manual-edit' ||
+          detail.maskMethod === 'color-dominant'
+        ) {
+          setMaskMeta({ method: detail.maskMethod, confidence: detail.maskConfidence });
+        } else {
           setMaskMeta({ method: 'manual-edit' });
         }
+
+        if (detail.maskUrl) {
+          const loaded = await loadMaskPixelsFromUrl(detail.maskUrl);
+          setMaskData(loaded.mask);
+          setRgbaData(loaded.rgba);
+          setMaskSize({ width: loaded.width, height: loaded.height });
+          if (detail.imageUrl) {
+            const detection = await detectHoldsFromPhoto({
+              uri: detail.imageUrl,
+              maxWidth: loaded.width,
+            });
+            setHoldDetection(detection);
+          }
+        } else if (detail.imageUrl) {
+          const img = await loadImageDimensions(detail.imageUrl);
+          const targetWidth = Math.min(img.width, 1200);
+          const scale = targetWidth / img.width;
+          const targetHeight = Math.round(img.height * scale);
+          const detection = await detectHoldsFromPhoto({
+            uri: detail.imageUrl,
+            maxWidth: targetWidth,
+          });
+          setHoldDetection(detection);
+          setMaskData(new Uint8Array(detection.width * detection.height));
+          setMaskSize({ width: detection.width, height: detection.height });
+          if (img.width !== targetWidth || img.height !== targetHeight) {
+            setMaskMeta({ method: 'manual-edit' });
+          }
+        }
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : 'The mask editor could not load.');
+      } finally {
+        setLoading(false);
       }
     };
     void load();
@@ -617,6 +636,8 @@ export function MaskEditorRoute() {
       });
       setHoldDetection(detection);
       applyRouteMask(detection, pickBestCluster(detection));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The route could not be regenerated.');
     } finally {
       setIsRegenerating(false);
     }
@@ -638,112 +659,140 @@ export function MaskEditorRoute() {
         confidence: method === 'manual-edit' ? null : (maskMeta.confidence ?? null),
       });
       navigate(`/problem/${problemId}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The route mask was not saved.');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="mask-editor">
-      <header className="mask-header">
-        <div className="mask-header-left">
-          <Button variant="ghost" onClick={() => navigate(-1)}>
-            Back
-          </Button>
-          <div className="mask-header-meta">
-            <span className="mono" style={{ color: 'var(--text-muted)' }}>
-              Mask editor
-            </span>
-            <span className="mask-header-title">Route mask</span>
+    <AppShell width="editor">
+      <div className="mask-workspace flex flex-col">
+        <header className="grid gap-3 border-b border-border bg-background px-4 py-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button variant="ghost" onClick={() => navigate(-1)}>
+              <ArrowLeft aria-hidden="true" />
+              Back
+            </Button>
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-semibold">Route mask</h1>
+              <p className="truncate text-xs text-muted-foreground">{hintText}</p>
+            </div>
           </div>
-        </div>
-        <div className="mask-header-center">
-          <Segmented
-            options={[
-              { value: 'select', label: 'Select' },
-              { value: 'edit', label: 'Edit' },
-              { value: 'pick-wall', label: 'Pick Wall' },
-            ]}
-            value={tool}
-            onChange={setTool}
-            label="Mask editor mode"
-          />
-          <span className="mask-header-hint">{hintText}</span>
-        </div>
-        <div className="mask-header-actions">
-          <Button variant="ghost" onClick={() => void handleAutoMask()} disabled={isRegenerating}>
-            {isRegenerating ? 'Auto route...' : 'Auto route'}
-          </Button>
-          <Button variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
-        </div>
-        <div className="mask-header-doodle" aria-hidden="true">
-          <DoodleScribble
-            style={{
-              color: 'var(--accent-primary)',
-              opacity: 0.2,
-            }}
-          />
-        </div>
-      </header>
 
-      <div className="mask-canvas">
-        {photoUrl && <img src={photoUrl} alt="Problem" className="mask-photo" />}
-        <canvas
-          ref={canvasRef}
-          className="mask-overlay"
-          style={{
-            cursor: tool === 'select' ? 'crosshair' : activeMode === 'add' ? 'crosshair' : 'cell',
-          }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
-        />
-      </div>
+          <ButtonGroup aria-label="Mask editor mode" className="w-full lg:w-auto">
+            {[
+              { value: 'select' as const, label: 'Select' },
+              { value: 'edit' as const, label: 'Edit' },
+              { value: 'pick-wall' as const, label: 'Pick wall' },
+            ].map((choice) => (
+              <Button
+                key={choice.value}
+                variant={tool === choice.value ? 'secondary' : 'outline'}
+                className="flex-1 lg:flex-none"
+                aria-pressed={tool === choice.value}
+                onClick={() => setTool(choice.value)}
+              >
+                {choice.label}
+              </Button>
+            ))}
+          </ButtonGroup>
 
-      {isEditing && (
-        <div className="mask-toolbar" role="toolbar" aria-label="Mask editing tools">
-          <button
-            type="button"
-            onClick={() => setMode('add')}
-            className={`mask-tool ${mode === 'add' ? 'active' : ''}`}
-            aria-pressed={mode === 'add'}
-          >
-            Add
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('erase')}
-            className={`mask-tool erase ${mode === 'erase' ? 'active' : ''}`}
-            aria-pressed={mode === 'erase'}
-          >
-            Erase
-          </button>
-
-          <div className="mask-toolbar-divider" />
-
-          {(['S', 'M', 'L'] as BrushSize[]).map((size) => (
-            <button
-              key={size}
-              type="button"
-              onClick={() => setBrushSize(size)}
-              className={`mask-tool size ${brushSize === size ? 'active' : ''}`}
-              aria-pressed={brushSize === size}
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => void handleAutoMask()}
+              disabled={isRegenerating || loading}
             >
-              {size}
-            </button>
-          ))}
+              {isRegenerating ? (
+                <LoaderCircle aria-hidden="true" className="animate-spin" />
+              ) : (
+                <Sparkles aria-hidden="true" />
+              )}
+              Auto route
+            </Button>
+            <Button onClick={handleSave} disabled={saving || loading || !maskData}>
+              {saving ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : null}
+              {saving ? 'Saving…' : 'Save mask'}
+            </Button>
+          </div>
+        </header>
 
-          <div className="mask-toolbar-divider" />
+        {loadError ? (
+          <div className="p-4">
+            <Alert variant="destructive">
+              <AlertTitle>Mask editor unavailable</AlertTitle>
+              <AlertDescription>{loadError}</AlertDescription>
+            </Alert>
+          </div>
+        ) : (
+          <div className="mask-canvas-stage">
+            {loading ? <Skeleton className="absolute inset-4" /> : null}
+            {photoUrl ? (
+              <img src={photoUrl} alt="Captured bouldering problem" className="mask-photo" />
+            ) : null}
+            <canvas
+              ref={canvasRef}
+              className="mask-overlay"
+              style={{
+                cursor:
+                  tool === 'select' ? 'crosshair' : activeMode === 'add' ? 'crosshair' : 'cell',
+              }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+            />
+          </div>
+        )}
 
-          <button type="button" onClick={handleFitToScreen} className="mask-tool">
-            Center
-          </button>
-        </div>
-      )}
-    </div>
+        {isEditing ? (
+          <div className="mask-toolbar" role="toolbar" aria-label="Mask editing tools">
+            <ButtonGroup>
+              <Button
+                variant={mode === 'add' ? 'secondary' : 'outline'}
+                aria-pressed={mode === 'add'}
+                onClick={() => setMode('add')}
+              >
+                <Brush aria-hidden="true" />
+                Add
+              </Button>
+              <Button
+                variant={mode === 'erase' ? 'secondary' : 'outline'}
+                aria-pressed={mode === 'erase'}
+                onClick={() => setMode('erase')}
+              >
+                <Eraser aria-hidden="true" />
+                Erase
+              </Button>
+            </ButtonGroup>
+
+            <Separator orientation="vertical" className="mx-1 hidden h-8 sm:block" />
+
+            <ButtonGroup aria-label="Brush size">
+              {(['S', 'M', 'L'] as BrushSize[]).map((size) => (
+                <Button
+                  key={size}
+                  variant={brushSize === size ? 'secondary' : 'outline'}
+                  size="icon"
+                  aria-label={`${size === 'S' ? 'Small' : size === 'M' ? 'Medium' : 'Large'} brush`}
+                  aria-pressed={brushSize === size}
+                  onClick={() => setBrushSize(size)}
+                >
+                  {size}
+                </Button>
+              ))}
+            </ButtonGroup>
+
+            <Button variant="ghost" onClick={handleFitToScreen} className="ml-auto">
+              <Focus aria-hidden="true" />
+              Center
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    </AppShell>
   );
 }
 

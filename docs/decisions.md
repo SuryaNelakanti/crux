@@ -524,3 +524,30 @@ Approved MVP behavior is now the three-action Session Film loop:
 3. Tapping **Flash**, **Sent**, or **Tried** writes the log immediately and returns control to the active session.
 
 There is no separate Save step and no default outcome. Attempts, grade, notes, sharing, session controls, and mask correction remain progressively disclosed. The primary route detail affordance is **Fix route**, shown when mask confidence is low or when the user opens more details.
+
+---
+
+## ADR-021: Camera-first consumer web interface
+
+**Date:** 2026-07-25
+
+**Status:** Accepted
+
+**Context:**
+The first restrained web redesign still read as a SaaS session dashboard. Crux is used by younger climbers with one hand in a dim gym, and its main job is capturing a route memory before the next attempt. Dashboard composition, management cards, decorative doodles, and oversized marketing copy all delayed that job.
+
+**Decision:**
+Use shadcn/ui Nova components with scoped Radix primitives, Lucide icons, Geist typography, Tailwind CSS v4, and semantic OKLCH tokens. Compose the product as a camera-first consumer app:
+
+- Home is **Tonight**, led by the active session film.
+- Capture stays in a persistent bottom dock within thumb reach.
+- Finished sessions move into the secondary **Journal**.
+- Problem detail remains photo-first and saves outcomes immediately.
+- Mask correction remains a focused full-height workflow.
+- Generated imagery, gradients, glass effects, random doodles, and analytics-style metric cards are excluded.
+
+**Consequences:**
+- The route photo and next action carry the hierarchy.
+- Desktop and mobile share one consumer interaction model instead of diverging into a dashboard.
+- Standard component states and accessibility behavior come from shadcn/Radix.
+- Web bundle imports use scoped Radix packages rather than the full barrel.

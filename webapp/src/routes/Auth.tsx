@@ -1,5 +1,9 @@
+import { LoaderCircle, Mountain } from 'lucide-react';
 import { useState } from 'react';
-import { Button, Input } from '@/components/ui';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 
 export function AuthRoute() {
   const [email, setEmail] = useState('');
@@ -8,7 +12,11 @@ export function AuthRoute() {
 
   const handleSend = async () => {
     const trimmed = email.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      setError('Enter your email address.');
+      setStatus('error');
+      return;
+    }
     setStatus('sending');
     setError(null);
     try {
@@ -24,63 +32,84 @@ export function AuthRoute() {
         throw new Error(signInError.message);
       }
       setStatus('sent');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to send magic link';
-      setError(message);
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : 'Unable to send the sign-in link.');
       setStatus('error');
     }
   };
 
   return (
-    <main className="auth-shell">
-      <section className="auth-scene" aria-labelledby="auth-promise">
-        <div className="auth-brand">
-          <span className="crux-mark" aria-hidden="true" />
-          <span>Crux</span>
+    <main className="min-h-screen bg-background px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-[1280px]">
+        <div className="flex h-12 items-center gap-2 font-semibold">
+          <Mountain aria-hidden="true" className="size-5 text-primary" />
+          Crux
         </div>
-        <div className="auth-promise">
-          <p className="eyebrow">Indoor bouldering journal</p>
-          <h1 id="auth-promise">Log the climb. Get back on the wall.</h1>
-          <p>Photo, route mask, outcome. Done in a few taps.</p>
+
+        <div className="mx-auto grid min-h-[calc(100vh-96px)] max-w-md place-items-center py-8">
+          <section className="w-full" aria-labelledby="sign-in-title">
+            <div className="mb-8">
+              <p className="mb-2 text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                Indoor bouldering journal
+              </p>
+              <h1 id="sign-in-title" className="text-2xl font-semibold tracking-tight">
+                Sign in to Crux
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                We will email you a secure sign-in link. No password required.
+              </p>
+            </div>
+
+            <form
+              className="space-y-6 rounded-lg border border-border bg-card p-6"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSend();
+              }}
+            >
+              <Field data-invalid={status === 'error'}>
+                <FieldLabel htmlFor="auth-email">Email</FieldLabel>
+                <Input
+                  id="auth-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  aria-invalid={status === 'error'}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    if (status === 'error') {
+                      setStatus('idle');
+                      setError(null);
+                    }
+                  }}
+                  required
+                />
+                <FieldDescription>
+                  Use the address linked to your climbing journal.
+                </FieldDescription>
+                {error ? <FieldError>{error}</FieldError> : null}
+              </Field>
+
+              <Button type="submit" disabled={status === 'sending'} className="w-full">
+                {status === 'sending' ? (
+                  <LoaderCircle aria-hidden="true" className="animate-spin" />
+                ) : null}
+                {status === 'sending' ? 'Sending link…' : 'Email me a sign-in link'}
+              </Button>
+
+              {status === 'sent' ? (
+                <Alert>
+                  <AlertTitle>Check your inbox</AlertTitle>
+                  <AlertDescription>
+                    The sign-in link has been sent to {email.trim()}.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+            </form>
+          </section>
         </div>
-      </section>
-
-      <section className="auth-entry" aria-labelledby="sign-in-title">
-        <form
-          className="auth-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void handleSend();
-          }}
-        >
-          <div>
-            <p className="eyebrow">Welcome back</p>
-            <h2 id="sign-in-title">Sign in</h2>
-            <p className="auth-supporting">No password required.</p>
-          </div>
-
-          <label className="auth-label" htmlFor="auth-email">
-            Email
-          </label>
-          <Input
-            id="auth-email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-
-          <Button variant="primary" type="submit" disabled={status === 'sending' || !email.trim()}>
-            {status === 'sending' ? 'Sending…' : 'Email me a sign-in link'}
-          </Button>
-
-          <div className="auth-status" aria-live="polite">
-            {status === 'sent' && <p>Check your inbox. Your link is on the way.</p>}
-            {error && <p className="auth-error">{error}</p>}
-          </div>
-        </form>
-      </section>
+      </div>
     </main>
   );
 }
