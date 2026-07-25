@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell, PageHeader } from '@/components/AppShell';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,8 +20,11 @@ const ProblemDetailRoute = lazy(() =>
 const SessionDetailRoute = lazy(() =>
   import('@/routes/SessionDetail').then((module) => ({ default: module.SessionDetailRoute }))
 );
-const SessionsRoute = lazy(() =>
-  import('@/routes/Sessions').then((module) => ({ default: module.SessionsRoute }))
+const JournalRoute = lazy(() =>
+  import('@/routes/Journal').then((module) => ({ default: module.JournalRoute }))
+);
+const TonightRoute = lazy(() =>
+  import('@/routes/Tonight').then((module) => ({ default: module.TonightRoute }))
 );
 
 function RouteFallback() {
@@ -121,11 +124,13 @@ export function App() {
     <TooltipProvider delayDuration={250}>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/" element={<SessionsRoute />} />
+          <Route path="/" element={<Navigate to="/tonight" replace />} />
+          <Route path="/tonight" element={<TonightRoute />} />
+          <Route path="/journal" element={<JournalRoute />} />
           <Route path="/session/:sessionId" element={<SessionDetailRoute />} />
           <Route path="/problem/:problemId" element={<ProblemDetailRoute />} />
           <Route path="/problem/:problemId/mask" element={<MaskEditorRoute />} />
-          <Route path="*" element={<SessionsRoute />} />
+          <Route path="*" element={<Navigate to="/tonight" replace />} />
         </Routes>
       </Suspense>
       <Toaster position="bottom-center" />

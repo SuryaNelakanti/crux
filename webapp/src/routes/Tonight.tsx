@@ -1,6 +1,6 @@
 import { ArrowRight, ImagePlus } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AppShell, CaptureDock } from '@/components/AppShell';
 import { ClimbCard } from '@/components/ClimbCard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -16,37 +16,19 @@ import {
 } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  createOrReuseActiveSession,
-  createProblemFromUpload,
-  fetchProblemsForSession,
-  fetchSessions,
-} from '@/lib/api';
+import { useCaptureFlow } from '@/hooks/useCaptureFlow';
+import { fetchProblemsForSession, fetchSessions } from '@/lib/api';
+import { formatSessionDate } from '@/lib/session-format';
 
 type Sessions = Awaited<ReturnType<typeof fetchSessions>>;
 type Problems = Awaited<ReturnType<typeof fetchProblemsForSession>>;
 
-const formatSessionDate = (date: Date) =>
-  date.toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
-
-const formatSessionMoment = (date: Date) => {
-  const hour = date.getHours();
-  const moment = hour < 5 ? 'night' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'night';
-  return `${date.toLocaleDateString(undefined, { weekday: 'long' })} ${moment}`;
-};
-
-export function SessionsRoute() {
-  const navigate = useNavigate();
-  const fileRef = useRef<HTMLInputElement | null>(null);
+export function TonightRoute() {
   const [sessions, setSessions] = useState<Sessions>([]);
   const [activeProblems, setActiveProblems] = useState<Problems>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { captureError, fileRef, handleFile, openCapture, uploading } = useCaptureFlow();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,9 +40,7 @@ export function SessionsRoute() {
       setSessions(sessionRows);
       setActiveProblems(problems);
     } catch (loadError) {
-      setError(
-        loadError instanceof Error ? loadError.message : 'Your journal could not be loaded.'
-      );
+      setError(loadError instanceof Error ? loadError.message : 'Tonight could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -70,37 +50,16 @@ export function SessionsRoute() {
     void load();
   }, [load]);
 
-  const handleCapture = () => fileRef.current?.click();
-
-  const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setError(null);
-    try {
-      const sessionId = await createOrReuseActiveSession();
-      const problemId = await createProblemFromUpload({ sessionId, file });
-      navigate(`/problem/${problemId}`);
-    } catch (captureError) {
-      setError(
-        captureError instanceof Error ? captureError.message : 'The photo could not be processed.'
-      );
-    } finally {
-      setUploading(false);
-      event.target.value = '';
-    }
-  };
-
   const activeSession = sessions.find((session) => !session.endTs) ?? null;
-  const previousSessions = sessions.filter((session) => session.endTs);
+  const visibleError = error ?? captureError;
 
   return (
     <AppShell>
       <div className="pb-24 sm:pb-28">
-        {error ? (
+        {visibleError ? (
           <Alert variant="destructive" className="mb-6">
             <AlertTitle>Could not complete that action</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{visibleError}</AlertDescription>
           </Alert>
         ) : null}
 
@@ -131,10 +90,10 @@ export function SessionsRoute() {
                     </span>
                   </div>
                   <h1 id="tonight-heading" className="text-3xl font-semibold tracking-tight">
-                    {formatSessionMoment(activeSession.startTs)}
+                    Tonight
                   </h1>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    {formatSessionDate(activeSession.startTs)} · Saved locally
+                    {formatSessionDate(activeSession.startTs)} · Saved
                   </p>
                 </div>
                 <Button variant="ghost" asChild className="shrink-0">
@@ -165,7 +124,7 @@ export function SessionsRoute() {
                   ))}
                   <Button
                     variant="ghost"
-                    onClick={handleCapture}
+                    onClick={openCapture}
                     disabled={uploading}
                     className="group grid h-auto aspect-[3/4] min-h-44 place-items-center rounded-lg border border-dashed border-border bg-muted/20 p-4 text-center hover:border-primary/50 hover:bg-muted/50"
                   >
@@ -192,63 +151,39 @@ export function SessionsRoute() {
                     </EmptyDescription>
                   </EmptyHeader>
                   <EmptyContent>
-                    <Button onClick={handleCapture}>Capture first climb</Button>
+                    <Button onClick={openCapture}>Capture first climb</Button>
                   </EmptyContent>
                 </Empty>
               )}
             </section>
           </>
         ) : (
-          <Empty className="min-h-[52dvh] border border-border">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <ImagePlus aria-hidden="true" />
-              </EmptyMedia>
-              <EmptyTitle>No active session</EmptyTitle>
-              <EmptyDescription>
-                Capture a route to start tonight’s session automatically.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button onClick={handleCapture}>Capture first climb</Button>
-            </EmptyContent>
-          </Empty>
+          <>
+            <header className="mb-8">
+              <p className="mb-2 text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                Ready when you are
+              </p>
+              <h1 className="text-3xl font-semibold tracking-tight">Tonight</h1>
+              <p className="mt-2 text-sm text-muted-foreground">No session in progress.</p>
+            </header>
+            <Empty className="min-h-[46dvh] border border-border">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <ImagePlus aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>Start a session with a photo</EmptyTitle>
+                <EmptyDescription>
+                  Crux creates tonight's session and traces the route automatically.
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button onClick={openCapture}>Capture first climb</Button>
+              </EmptyContent>
+            </Empty>
+          </>
         )}
 
-        <section id="journal" className="mt-14 scroll-mt-20" aria-labelledby="journal-heading">
-          <div className="mb-4">
-            <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">
-              Your climbing memory
-            </p>
-            <h2 id="journal-heading" className="mt-1 text-xl font-semibold">
-              Journal
-            </h2>
-          </div>
-          {previousSessions.length > 0 ? (
-            <div className="border-y border-border">
-              {previousSessions.map((session) => (
-                <Link key={session.id} to={`/session/${session.id}`} className="session-row">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {formatSessionDate(session.startTs)}
-                    </p>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">
-                      {session.problemCount} climbs · {session.flashCount} flashed ·{' '}
-                      {session.sendCount} sent
-                    </p>
-                  </div>
-                  <ArrowRight aria-hidden="true" className="size-4 text-muted-foreground" />
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="border-y border-border py-6 text-sm text-muted-foreground">
-              Finished sessions will live here.
-            </p>
-          )}
-        </section>
-
-        <CaptureDock onCapture={handleCapture} uploading={uploading} />
+        <CaptureDock onCapture={openCapture} uploading={uploading} active="tonight" />
         <Input
           ref={fileRef}
           type="file"

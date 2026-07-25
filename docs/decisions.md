@@ -551,3 +551,28 @@ Use shadcn/ui Nova components with scoped Radix primitives, Lucide icons, Geist 
 - Desktop and mobile share one consumer interaction model instead of diverging into a dashboard.
 - Standard component states and accessibility behavior come from shadcn/Radix.
 - Web bundle imports use scoped Radix packages rather than the full barrel.
+
+---
+
+## ADR-022: Tonight and Journal are separate destinations
+
+**Date:** 2026-07-25
+
+**Status:** Accepted
+
+**Context:**
+The bottom dock named Tonight and Journal, but both controls resolved to sections of the same page. The labels implied distinct destinations and made the navigation feel unfinished.
+
+**Decision:**
+Give each label one clear responsibility:
+
+- `/tonight` contains only the live session, route film, and next capture.
+- `/journal` contains only finished sessions, grouped chronologically.
+- `/` redirects to `/tonight`.
+- Capture remains available from both destinations and reuses or starts the active session.
+- The dock shows the current destination visually and through `aria-current`.
+
+**Consequences:**
+- Active climbing and past sessions no longer compete on one screen.
+- The navigation matches the user's mental model and browser history.
+- Session detail returns to Tonight for live sessions and Journal for finished sessions.

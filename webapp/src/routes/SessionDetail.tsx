@@ -132,6 +132,9 @@ export function SessionDetailRoute() {
 
   if (!sessionId) return null;
 
+  const returnPath = sessionData?.isLive === false ? '/journal' : '/tonight';
+  const returnLabel = sessionData?.isLive === false ? 'Journal' : 'Tonight';
+
   const finishSession = sessionData?.isLive ? (
     <AlertDialog>
       <AlertDialogTrigger asChild>
@@ -160,9 +163,9 @@ export function SessionDetailRoute() {
   return (
     <AppShell width="wide">
       <div className="pb-24 sm:pb-28">
-        <Button variant="ghost" onClick={() => navigate('/')} className="-ml-3 mb-6">
+        <Button variant="ghost" onClick={() => navigate(returnPath)} className="-ml-3 mb-6">
           <ArrowLeft aria-hidden="true" />
-          Sessions
+          {returnLabel}
         </Button>
 
         <header className="mb-8 flex flex-col gap-6 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
@@ -247,7 +250,7 @@ export function SessionDetailRoute() {
           <CaptureDock
             onCapture={() => fileRef.current?.click()}
             uploading={uploading}
-            journalHref="/#journal"
+            active="tonight"
           />
         ) : null}
 

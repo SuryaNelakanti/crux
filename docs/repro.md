@@ -20,15 +20,17 @@
 
 ## Web flow (local mock, default)
 1. `pnpm -C webapp dev`
-2. Open the web app. It enters a seeded active session without authentication or network calls.
-3. Review the example Flash and Sent climbs.
-4. Tap `Log a climb` and choose a local photo.
-5. Confirm the existing heuristic pipeline generates a route-mask overlay.
-6. Tap Flash, Sent, or Tried. Confirm the app returns to the active session without a separate save action.
-7. Open the problem again, add attempts, grade, or a note, then update details.
-8. Open `Fix route`, brush add/remove, and save a new mask version.
-9. Reload the page. Confirm the session, problem, log, and mask remain.
-10. Tap `Reset demo` to restore the seed state.
+2. Open `/`. Confirm it redirects to `/tonight` without authentication or network calls.
+3. Confirm Tonight shows only the seeded active session and its Flash and Sent climbs.
+4. Open Journal from the bottom dock. Confirm the URL is `/journal`, the dock marks Journal as current, and finished sessions are grouped by month.
+5. Open a finished session and confirm its back action returns to Journal.
+6. Return to Tonight, tap Capture, and choose a local photo.
+7. Confirm the existing heuristic pipeline generates a route-mask overlay.
+8. Tap Flash, Sent, or Tried. Confirm the app returns to the active session without a separate save action.
+9. Open the problem again, add attempts, grade, or a note, then update details.
+10. Open `Fix route`, brush add/remove, and save a new mask version.
+11. Reload the page. Confirm the session, problem, log, and mask remain.
+12. Tap `Reset demo` to restore the seed state.
 
 ## Web integration flow (Supabase)
 1. Set `VITE_DATA_MODE=supabase`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY` in `webapp/.env`.

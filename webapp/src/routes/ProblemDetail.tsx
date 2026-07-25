@@ -111,7 +111,7 @@ export function ProblemDetailRoute() {
   if (loading) {
     return (
       <AppShell width="wide">
-        <PageHeader title="Log outcome" backTo="/" backLabel="Sessions" />
+        <PageHeader title="Log outcome" backTo="/tonight" backLabel="Tonight" />
         <div className="grid gap-6 lg:grid-cols-12">
           <Skeleton className="min-h-[560px] lg:col-span-7" />
           <Skeleton className="h-80 lg:col-span-5" />
@@ -123,7 +123,7 @@ export function ProblemDetailRoute() {
   if (!detail || loadFailed) {
     return (
       <AppShell>
-        <PageHeader title="Climb unavailable" backTo="/" backLabel="Sessions" />
+        <PageHeader title="Climb unavailable" backTo="/tonight" backLabel="Tonight" />
         <Alert variant="destructive">
           <AlertTitle>This climb could not be loaded</AlertTitle>
           <AlertDescription>Return to your sessions and try opening it again.</AlertDescription>

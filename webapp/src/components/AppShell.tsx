@@ -1,6 +1,6 @@
 import { ArrowLeft, BookOpen, Camera, Database, Home, Mountain, RotateCcw } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -20,7 +20,7 @@ export function AppShell({
   const handleAccountAction = async () => {
     if (isLocalMockMode) {
       await resetLocalDemo();
-      navigate('/');
+      navigate('/tonight');
       window.location.reload();
       return;
     }
@@ -32,7 +32,7 @@ export function AppShell({
       <header className="sticky top-0 z-40 border-b border-border/80 bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-[1120px] items-center gap-4 px-4 sm:px-6">
           <Button variant="ghost" asChild className="-ml-2 gap-2 px-2 font-semibold">
-            <Link to="/" aria-label="Crux sessions">
+            <Link to="/tonight" aria-label="Crux tonight">
               <Mountain aria-hidden="true" className="text-primary" />
               <span>Crux</span>
             </Link>
@@ -122,32 +122,40 @@ export function PageHeader({
 export function CaptureDock({
   onCapture,
   uploading,
-  journalHref = '#journal',
+  active,
 }: {
   onCapture: () => void;
   uploading: boolean;
-  journalHref?: string;
+  active?: 'tonight' | 'journal';
 }) {
   return (
     <nav
       aria-label="Primary"
       className="fixed inset-x-0 bottom-0 z-30 mx-auto grid max-w-[520px] grid-cols-3 border-t border-border bg-background/96 p-2 pb-[calc(8px+env(safe-area-inset-bottom))] backdrop-blur-md sm:bottom-4 sm:rounded-lg sm:border"
     >
-      <Button variant="ghost" asChild className="h-12 flex-col gap-0.5 text-xs">
-        <Link to="/">
+      <Button
+        variant={active === 'tonight' ? 'secondary' : 'ghost'}
+        asChild
+        className={cn('h-12 flex-col gap-0.5 text-xs', active === 'tonight' && 'text-primary')}
+      >
+        <NavLink to="/tonight">
           <Home aria-hidden="true" />
           Tonight
-        </Link>
+        </NavLink>
       </Button>
       <Button onClick={onCapture} disabled={uploading} className="h-12">
         <Camera aria-hidden="true" />
         {uploading ? 'Tracing…' : 'Capture'}
       </Button>
-      <Button variant="ghost" asChild className="h-12 flex-col gap-0.5 text-xs">
-        <a href={journalHref}>
+      <Button
+        variant={active === 'journal' ? 'secondary' : 'ghost'}
+        asChild
+        className={cn('h-12 flex-col gap-0.5 text-xs', active === 'journal' && 'text-primary')}
+      >
+        <NavLink to="/journal">
           <BookOpen aria-hidden="true" />
           Journal
-        </a>
+        </NavLink>
       </Button>
     </nav>
   );

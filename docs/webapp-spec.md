@@ -13,21 +13,26 @@
 ## Primary Flows
 1. Auth (email magic link)
    - Enter email -> receive magic link -> session is created in-app.
-2. Tonight / journal
+2. Tonight
    - Open directly into the active session film when one exists.
    - Keep route photography ahead of counts and session management.
    - Keep capture in a persistent thumb-reach dock.
-   - Show finished sessions as a secondary journal.
-3. Session detail
+3. Journal
+   - Keep finished sessions in a dedicated chronological archive.
+   - Group sessions by month and open each entry into session detail.
+   - Keep Capture available without mixing active and finished sessions.
+4. Session detail
    - Upload problem photo.
    - List problems with outcome + grade chips.
-4. Problem detail
+5. Problem detail
    - View photo with mask overlay toggle.
    - Log outcome, attempts, grade range, note.
    - Edit mask (brush add/erase) and save as a new mask version.
 
 ## Routes
-- `/` Sessions
+- `/` redirects to Tonight
+- `/tonight` Active session film
+- `/journal` Finished session archive
 - `/session/:sessionId` Session detail
 - `/problem/:problemId` Problem detail
 - `/problem/:problemId/mask` Mask editor
@@ -80,4 +85,4 @@ Mask correction is named **Fix route** and is progressively disclosed by low con
 
 ## 2026-07-25 Consumer UI Update
 
-The web shell is mobile-first and image-led. Home is **Tonight**, not a sessions dashboard. It shows the current session film, keeps Capture in a bottom dock, and moves finished sessions into the secondary Journal section. Desktop retains the same consumer composition at a readable content width rather than expanding into dashboard cards.
+The web shell is mobile-first and image-led. **Tonight** is the active-session destination at `/tonight`; **Journal** is the finished-session archive at `/journal`. Capture remains in the bottom dock on both pages. Desktop retains the same consumer composition at a readable content width rather than expanding into dashboard cards.
